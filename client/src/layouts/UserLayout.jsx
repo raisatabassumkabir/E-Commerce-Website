@@ -39,9 +39,7 @@ const UserLayout = () => {
     <div className="min-h-screen flex flex-col bg-nude-50">
       {/* ── Navbar ─────────────────────────────────────────────────────────── */}
       <header
-        className={`fixed top-0 left-0 right-0 z-30 transition-all duration-300 ${
-          isScrolled ? 'bg-white border-b border-line shadow-subtle' : 'bg-transparent border-b border-transparent'
-        }`}
+        className="sticky top-0 z-50 bg-white border-b border-neutral-100/80 shadow-[0_4px_20px_rgba(26,25,24,0.05)] transition-all duration-300"
       >
         <div className="container-page">
           <nav className="flex items-center justify-between h-16 md:h-20">
@@ -200,7 +198,7 @@ const UserLayout = () => {
       </header>
 
       {/* ── Main Content ───────────────────────────────────────────────────── */}
-      <main className="flex-1 pt-16 md:pt-20">
+      <main className="flex-1">
         <Outlet />
       </main>
 
