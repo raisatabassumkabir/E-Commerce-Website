@@ -24,9 +24,25 @@ const emptyForm = {
 
 // Inventory status badge helper
 const StockBadge = ({ count }) => {
-  if (count === 0) return <span className="badge-red flex items-center gap-1"><AlertTriangle size={10} /> 0 units</span>;
-  if (count <= 5) return <span className="badge-yellow">{count} units</span>;
-  return <span className="badge-green">{count} units</span>;
+  if (count === 0) {
+    return (
+      <span className="border border-red-200 bg-white text-red-600 text-xs px-2.5 py-1 font-medium rounded-full flex items-center gap-1 w-fit">
+        <AlertTriangle size={10} /> OUT OF STOCK
+      </span>
+    );
+  }
+  if (count <= 5) {
+    return (
+      <span className="border border-yellow-200 bg-white text-yellow-600 text-xs px-2.5 py-1 font-medium rounded-full w-fit inline-block">
+        {count} UNITS LEFT
+      </span>
+    );
+  }
+  return (
+    <span className="border border-neutral-200 bg-white text-neutral-800 text-xs px-2.5 py-1 font-medium rounded-full w-fit inline-block">
+      {count} UNITS
+    </span>
+  );
 };
 
 const ProductManage = () => {
@@ -193,11 +209,11 @@ const ProductManage = () => {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="heading-display text-2xl text-white mb-1">Products</h1>
-          <p className="text-white/40 text-sm">
+          <h1 className="heading-display text-2xl text-neutral-900 mb-1">Products</h1>
+          <p className="text-neutral-500 text-sm">
             {products.length} products total
             {lowStockCount > 0 && (
-              <span className="ml-2 text-yellow-400 font-medium">· {lowStockCount} low stock</span>
+              <span className="ml-2 text-yellow-600 font-semibold">· {lowStockCount} low stock</span>
             )}
           </p>
         </div>
@@ -219,19 +235,19 @@ const ProductManage = () => {
           />
         </div>
         <label
-          className="flex items-center gap-2 cursor-pointer glass-sm rounded-xl px-4 py-3 hover:bg-white/10 transition-colors"
+          className="flex items-center gap-2 cursor-pointer bg-white border border-neutral-200/60 shadow-subtle rounded-xl px-4 py-3 hover:bg-neutral-50 transition-colors"
           id="filter-low-stock"
         >
           <input
             type="checkbox"
             checked={filterLowStock}
             onChange={(e) => setFilterLowStock(e.target.checked)}
-            className="w-4 h-4 accent-brand-500"
+            className="w-4 h-4 accent-brand-900"
           />
-          <AlertTriangle size={14} className="text-yellow-400" />
-          <span className="text-white/70 text-sm">Low Stock Only</span>
+          <AlertTriangle size={14} className="text-yellow-600" />
+          <span className="text-neutral-700 text-sm font-medium">Low Stock Only</span>
           {lowStockCount > 0 && (
-            <span className="w-5 h-5 rounded-full bg-yellow-500 text-black text-[10px] font-bold flex items-center justify-center">
+            <span className="w-5 h-5 rounded-full bg-yellow-500 text-white text-[10px] font-bold flex items-center justify-center">
               {lowStockCount}
             </span>
           )}
@@ -245,27 +261,23 @@ const ProductManage = () => {
       {loading ? (
         <div className="flex justify-center py-20"><Spinner size="xl" /></div>
       ) : (
-        <div className="glass-sm rounded-2xl overflow-hidden">
+        <div className="bg-white border border-neutral-200/60 shadow-subtle rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left p-4 text-white/40 font-medium">Product</th>
-                  <th className="text-left p-4 text-white/40 font-medium">Category</th>
-                  <th className="text-left p-4 text-white/40 font-medium">Price</th>
-                  <th className="text-left p-4 text-white/40 font-medium">
-                    <span className="flex items-center gap-1.5">
-                      <Package size={13} /> Stock Units
-                    </span>
-                  </th>
-                  <th className="text-left p-4 text-white/40 font-medium">Status</th>
-                  <th className="text-right p-4 text-white/40 font-medium">Actions</th>
+                <tr className="border-b border-neutral-200 bg-neutral-50/50">
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">IMAGE</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">NAME/CATEGORY</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">PRICE</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">STOCK UNITS</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">STATUS</th>
+                  <th className="text-right p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center p-12 text-white/30">
+                    <td colSpan={6} className="text-center p-12 text-neutral-400">
                       No products found
                     </td>
                   </tr>
@@ -274,42 +286,40 @@ const ProductManage = () => {
                     <tr
                       key={product._id}
                       id={`product-row-${product._id}`}
-                      className={`border-b border-white/5 hover:bg-white/[0.02] transition-colors ${
-                        product.inventoryCount === 0 ? 'bg-red-900/5' : ''
+                      className={`border-b border-neutral-100 hover:bg-neutral-50 transition-colors ${
+                        product.inventoryCount === 0 ? 'bg-red-50/30' : ''
                       }`}
                     >
-                      {/* Product info */}
+                      {/* Product image */}
                       <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={product.images?.[0]?.url}
-                            alt={product.title}
-                            className="w-10 h-12 object-cover rounded-lg bg-dark-700 flex-shrink-0"
-                          />
-                          <div>
-                            <p className="text-white font-medium line-clamp-1 max-w-[200px]">{product.title}</p>
-                            <p className="text-white/30 text-xs">
-                              {product.brand && `${product.brand} · `}{product.sizes?.join(', ')}
-                            </p>
-                          </div>
-                        </div>
+                        <img
+                          src={product.images?.[0]?.url}
+                          alt={product.title}
+                          className="w-10 h-12 object-cover rounded-lg bg-neutral-100 flex-shrink-0"
+                        />
                       </td>
 
-                      {/* Category */}
+                      {/* Product Name/Category */}
                       <td className="p-4">
-                        <div className="flex flex-col gap-1">
-                          <span className="badge-brand text-xs">{product.category}</span>
-                          {product.subcategory && (
-                            <span className="text-white/30 text-[10px]">{product.subcategory}</span>
-                          )}
+                        <div>
+                          <p className="text-neutral-900 font-semibold text-sm line-clamp-1 max-w-[250px]">{product.title}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-neutral-800 font-semibold text-[10px] tracking-wider uppercase">{product.category}</span>
+                            {product.subcategory && (
+                              <span className="text-neutral-400 text-[10px] uppercase tracking-wider">· {product.subcategory}</span>
+                            )}
+                          </div>
+                          <p className="text-neutral-400 text-[10px] mt-0.5">
+                            {product.brand && `${product.brand} · `}{product.sizes?.join(', ')}
+                          </p>
                         </div>
                       </td>
 
                       {/* Price */}
                       <td className="p-4">
-                        <p className="text-white font-semibold">${Number(product.price).toFixed(2)}</p>
+                        <p className="text-neutral-900 font-semibold">${Number(product.price).toFixed(2)}</p>
                         {product.comparePrice && (
-                          <p className="text-white/30 text-xs line-through">${Number(product.comparePrice).toFixed(2)}</p>
+                          <p className="text-neutral-400 text-xs line-through">${Number(product.comparePrice).toFixed(2)}</p>
                         )}
                       </td>
 
@@ -325,7 +335,7 @@ const ProductManage = () => {
                             {product.isPublished !== false ? 'Published' : 'Draft'}
                           </span>
                           {product.isFeatured && (
-                            <span className="text-amber-400 text-[10px]">★ Featured</span>
+                            <span className="text-amber-600 text-[10px] font-medium">★ Featured</span>
                           )}
                         </div>
                       </td>
@@ -338,7 +348,7 @@ const ProductManage = () => {
                             id={`restock-${product._id}`}
                             onClick={() => openRestock(product)}
                             title="Update inventory"
-                            className="p-2 text-white/40 hover:text-emerald-400 hover:bg-emerald-900/20 rounded-lg transition-colors"
+                            className="p-2 text-neutral-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                           >
                             <Package size={15} />
                           </button>
@@ -348,7 +358,7 @@ const ProductManage = () => {
                             id={`edit-product-${product._id}`}
                             onClick={() => openEdit(product)}
                             title="Edit product"
-                            className="p-2 text-white/40 hover:text-brand-400 hover:bg-brand-900/20 rounded-lg transition-colors"
+                            className="p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
                           >
                             <Pencil size={15} />
                           </button>
@@ -359,7 +369,7 @@ const ProductManage = () => {
                             onClick={() => handleDelete(product._id)}
                             disabled={deleting === product._id}
                             title="Delete product"
-                            className="p-2 text-white/40 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                            className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >
                             {deleting === product._id ? <Spinner size="sm" /> : <Trash2 size={15} />}
                           </button>

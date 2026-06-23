@@ -46,54 +46,54 @@ const OrderManage = () => {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="heading-display text-2xl text-white mb-1">Orders</h1>
-          <p className="text-white/40 text-sm">{orders.length} orders</p>
+          <h1 className="heading-display text-2xl text-neutral-900 mb-1">Orders</h1>
+          <p className="text-neutral-500 text-sm">{orders.length} orders</p>
         </div>
         <div className="relative">
           <select
             id="admin-orders-filter"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="input appearance-none pr-10 min-w-[180px]"
+            className="input appearance-none pr-10 min-w-[180px] bg-white border border-neutral-200/80"
           >
-            <option value="" className="bg-dark-800">All Statuses</option>
+            <option value="" className="bg-white text-neutral-900">All Statuses</option>
             {DELIVERY_STATUSES.map((s) => (
-              <option key={s} value={s} className="bg-dark-800">{s}</option>
+              <option key={s} value={s} className="bg-white text-neutral-900">{s}</option>
             ))}
           </select>
-          <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+          <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
         </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-20"><Spinner size="xl" /></div>
       ) : (
-        <div className="glass-sm rounded-2xl overflow-hidden">
+        <div className="bg-white border border-neutral-200/60 shadow-subtle rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left p-4 text-white/40 font-medium">Order</th>
-                  <th className="text-left p-4 text-white/40 font-medium">Customer</th>
-                  <th className="text-left p-4 text-white/40 font-medium">Date</th>
-                  <th className="text-left p-4 text-white/40 font-medium">Total</th>
-                  <th className="text-left p-4 text-white/40 font-medium">Payment</th>
-                  <th className="text-left p-4 text-white/40 font-medium">Delivery Status</th>
+                <tr className="border-b border-neutral-200 bg-neutral-50/50">
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">Order</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">Customer</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">Date</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">Total</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">Payment</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">Delivery Status</th>
                 </tr>
               </thead>
               <tbody>
                 {orders.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center p-10 text-white/30">No orders found</td></tr>
+                  <tr><td colSpan={6} className="text-center p-10 text-neutral-400">No orders found</td></tr>
                 ) : (
                   orders.map((order) => (
-                    <tr key={order._id} id={`admin-order-row-${order._id}`} className="border-b border-white/5 hover:bg-white/3 transition-colors">
-                      <td className="p-4 font-mono text-xs text-white/60">#{order._id.slice(-8).toUpperCase()}</td>
+                    <tr key={order._id} id={`admin-order-row-${order._id}`} className="border-b border-neutral-100 hover:bg-neutral-50 transition-colors">
+                      <td className="p-4 font-mono text-xs text-neutral-500">#{order._id.slice(-8).toUpperCase()}</td>
                       <td className="p-4">
-                        <p className="text-white">{order.user?.name}</p>
-                        <p className="text-white/30 text-xs">{order.user?.email}</p>
+                        <p className="text-neutral-900 font-semibold">{order.user?.name}</p>
+                        <p className="text-neutral-400 text-xs">{order.user?.email}</p>
                       </td>
-                      <td className="p-4 text-white/50">{new Date(order.createdAt).toLocaleDateString()}</td>
-                      <td className="p-4 text-white font-semibold">${order.totalPrice?.toFixed(2)}</td>
+                      <td className="p-4 text-neutral-500">{new Date(order.createdAt).toLocaleDateString()}</td>
+                      <td className="p-4 text-neutral-900 font-semibold">${order.totalPrice?.toFixed(2)}</td>
                       <td className="p-4">
                         <span className={order.paymentStatus === 'Paid' ? 'badge-green' : order.paymentStatus === 'Pending' ? 'badge-yellow' : 'badge-red'}>
                           {order.paymentStatus}
@@ -109,13 +109,13 @@ const OrderManage = () => {
                             className={`input text-xs py-1.5 pr-8 appearance-none cursor-pointer min-w-[150px] ${STATUS_BADGE[order.deliveryStatus] || ''}`}
                           >
                             {DELIVERY_STATUSES.map((s) => (
-                              <option key={s} value={s} className="bg-dark-800 text-white">{s}</option>
+                              <option key={s} value={s} className="bg-white text-neutral-900">{s}</option>
                             ))}
                           </select>
                           {updating === order._id ? (
                             <Spinner size="sm" className="absolute right-2 top-1/2 -translate-y-1/2" />
                           ) : (
-                            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
                           )}
                         </div>
                       </td>

@@ -24,13 +24,13 @@ const AdminLayout = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-dark-900">
+    <div className="min-h-screen flex bg-[#F9F8F6]">
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
       <aside
-        className={`${sidebarOpen ? 'w-64' : 'w-16'} sidebar-transition flex-shrink-0 glass-dark border-r border-white/10 flex flex-col min-h-screen sticky top-0 h-screen z-20`}
+        className={`${sidebarOpen ? 'w-64' : 'w-16'} sidebar-transition flex-shrink-0 bg-white border-r border-neutral-200/80 flex flex-col min-h-screen sticky top-0 h-screen z-20`}
       >
         {/* Logo */}
-        <div className={`flex items-center h-16 px-4 border-b border-white/10 ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
+        <div className={`flex items-center h-16 px-4 border-b border-neutral-200/80 ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
           {sidebarOpen && (
             <Link to="/" className="flex items-center gap-2 group">
               <div className="w-7 h-7 rounded-lg bg-gradient-brand flex items-center justify-center">
@@ -42,7 +42,7 @@ const AdminLayout = () => {
           <button
             id="admin-sidebar-toggle"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900 transition-colors"
           >
             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -59,8 +59,8 @@ const AdminLayout = () => {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
                   isActive
-                    ? 'bg-brand-900/50 text-brand-400 shadow-brand'
-                    : 'text-white/50 hover:text-white hover:bg-white/5'
+                    ? 'bg-brand-900 text-white shadow-elegant'
+                    : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100'
                 } ${!sidebarOpen ? 'justify-center' : ''}`
               }
               title={!sidebarOpen ? label : undefined}
@@ -77,22 +77,22 @@ const AdminLayout = () => {
         </nav>
 
         {/* User info at bottom */}
-        <div className={`p-3 border-t border-white/10 ${!sidebarOpen ? 'flex justify-center' : ''}`}>
+        <div className={`p-3 border-t border-neutral-200/80 ${!sidebarOpen ? 'flex justify-center' : ''}`}>
           {sidebarOpen ? (
-            <div className="glass-sm rounded-xl p-3">
+            <div className="bg-[#F9F8F6] border border-neutral-200/60 rounded-xl p-3">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 rounded-full bg-gradient-brand flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-brand-900 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                   {user?.name?.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{user?.name}</p>
-                  <p className="text-white/30 text-xs truncate">{user?.email}</p>
+                  <p className="text-neutral-900 text-sm font-medium truncate">{user?.name}</p>
+                  <p className="text-neutral-500 text-xs truncate">{user?.email}</p>
                 </div>
               </div>
               <button
                 id="admin-logout"
                 onClick={handleLogout}
-                className="flex items-center gap-2 w-full px-3 py-2 text-white/50 hover:text-red-400 hover:bg-red-900/10 rounded-lg transition-colors text-xs"
+                className="flex items-center gap-2 w-full px-3 py-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors text-xs"
               >
                 <LogOut size={14} /> Sign Out
               </button>
@@ -100,7 +100,7 @@ const AdminLayout = () => {
           ) : (
             <button
               onClick={handleLogout}
-              className="p-2 rounded-xl text-white/40 hover:text-red-400 hover:bg-red-900/10 transition-colors"
+              className="p-2 rounded-xl text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
               title="Sign Out"
             >
               <LogOut size={18} />
@@ -112,10 +112,10 @@ const AdminLayout = () => {
       {/* ── Main ──────────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="glass-dark border-b border-white/10 h-16 flex items-center justify-between px-6 sticky top-0 z-10">
+        <header className="bg-white border-b border-neutral-200/80 h-16 flex items-center justify-between px-6 sticky top-0 z-10">
           <div>
-            <h1 className="text-white font-semibold text-sm font-display">Admin Panel</h1>
-            <p className="text-white/30 text-xs">ThreadHaus Management</p>
+            <h1 className="text-neutral-900 font-semibold text-sm font-display">Admin Panel</h1>
+            <p className="text-neutral-500 text-xs">ThreadHaus Management</p>
           </div>
           <div className="flex items-center gap-3">
             <Link
