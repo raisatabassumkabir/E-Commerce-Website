@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-[#E5E0D8];
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    /* Ivory background and Charcoal text */
+    @apply bg-[#FDFBF9] text-[#1A1918] font-sans antialiased;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-[#FDFBF9];
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-[#E5E0D8] rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-brand-800;
+  }
+
+  ::selection {
+    @apply bg-brand-900 text-white;
+  }
+}
+
+@layer components {
+  /* ── Structural Containers ───────────────────────────────── */
+  .glass {
+    @apply bg-white border border-[#E5E0D8] shadow-subtle;
+  }
+
+  .glass-sm {
+    @apply bg-white border border-[#E5E0D8] shadow-subtle;
+  }
+
+  .glass-dark {
+    @apply bg-[#F7F4EF] border border-[#E5E0D8] shadow-subtle;
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-sm font-medium
+           transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed
+           focus:outline-none focus:ring-1 focus:ring-brand-900 focus:ring-offset-1 focus:ring-offset-[#FDFBF9]
+           active:scale-[0.99] cursor-pointer;
+  }
+
+  /* Matte Black CTA */
+  .btn-primary {
+    @apply btn bg-accent-500 text-white hover:bg-accent-600;
+  }
+
+  /* Minimal Secondary Button */
+  .btn-secondary {
+    @apply btn bg-transparent text-brand-900 border border-brand-900 hover:bg-brand-900 hover:text-white;
+  }
+
+  .btn-danger {
+    @apply btn bg-[#800020] text-white hover:bg-[#600018]; /* Burgundy for danger */
+  }
+
+  .btn-sm { @apply px-4 py-2 text-sm; }
+  .btn-md { @apply px-6 py-3 text-base; }
+  .btn-lg { @apply px-8 py-4 text-lg; }
+
+  /* ── Cards ───────────────────────────────────────────────── */
+  .card {
+    @apply bg-white rounded-sm border border-[#E5E0D8] p-6 animate-fade-in;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-elegant transition-shadow duration-300;
+  }
+
+  /* ── Inputs ──────────────────────────────────────────────── */
+  .input {
+    @apply w-full bg-white border border-[#E5E0D8] text-brand-900 placeholder-brand-900/40
+           rounded-sm px-4 py-3 focus:outline-none focus:ring-1 focus:ring-brand-900
+           focus:border-brand-900 transition-all duration-200;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-brand-900/70 mb-1.5;
+  }
+
+  /* ── Badges ──────────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-sm text-[10px] uppercase tracking-wider font-semibold;
+  }
+
+  .badge-brand { @apply badge bg-brand-900 text-white; }
+  .badge-green { @apply badge bg-[#228B22] text-white; }
+  .badge-yellow { @apply badge bg-[#C19A6B] text-white; }
+  .badge-red { @apply badge bg-[#800020] text-white; }
+  .badge-blue { @apply badge bg-brand-800 text-white; }
+
+  /* ── Typography ──────────────────────────────────────────── */
+  .heading-display {
+    @apply font-display font-medium leading-tight tracking-tight text-brand-900;
+  }
+
+  .gradient-text {
+    @apply text-brand-900; /* No gradients, solid high-end text */
+  }
+
+  /* ── Dividers ─────────────────────────────────────────────── */
+  .divider {
+    @apply border-t border-[#E5E0D8];
+  }
+
+  /* ── Skeleton loader ─────────────────────────────────────── */
+  .skeleton {
+    @apply bg-[#F5F0E6] rounded-sm animate-pulse;
+  }
+
+  /* ── Page container ──────────────────────────────────────── */
+  .container-page {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+
+  .sidebar-transition {
+    transition: width 0.3s ease, transform 0.3s ease;
+  }
+
+  .dynamic-underline {
+    position: relative;
+  }
+  .dynamic-underline::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    transform: scaleX(0);
+    height: 1px;
+    bottom: -2px;
+    left: 0;
+    background-color: currentColor;
+    transform-origin: bottom right;
+    transition: transform 0.25s ease-out;
+  }
+  .dynamic-underline:hover::after {
+    transform: scaleX(1);
+    transform-origin: bottom left;
+  }
+}
