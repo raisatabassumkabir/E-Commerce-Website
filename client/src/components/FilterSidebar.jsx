@@ -15,10 +15,10 @@ const FilterSidebar = ({ filters, onChange, onClear, productCount }) => {
     setExpandedSections((p) => ({ ...p, [section]: !p[section] }));
 
   const Section = ({ id, title, children }) => (
-    <div className="border-b border-white/10 pb-5 mb-5">
+    <div className="border-b border-neutral-200 pb-5 mb-5">
       <button
         onClick={() => toggle(id)}
-        className="flex items-center justify-between w-full text-white/80 hover:text-white transition-colors mb-3"
+        className="flex items-center justify-between w-full text-neutral-800 hover:text-neutral-900 transition-colors mb-3"
       >
         <span className="font-medium">{title}</span>
         {expandedSections[id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -31,8 +31,8 @@ const FilterSidebar = ({ filters, onChange, onClear, productCount }) => {
     <aside className="glass-sm rounded-2xl p-5 sticky top-24 w-full">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal size={16} className="text-brand-400" />
-          <span className="font-semibold text-white">Filters</span>
+          <SlidersHorizontal size={16} className="text-brand-900" />
+          <span className="font-semibold text-neutral-900">Filters</span>
         </div>
         {(filters.category || filters.size || filters.minPrice || filters.maxPrice) && (
           <button
@@ -45,7 +45,7 @@ const FilterSidebar = ({ filters, onChange, onClear, productCount }) => {
         )}
       </div>
 
-      <p className="text-white/30 text-sm mb-6">{productCount} products</p>
+      <p className="text-neutral-500 text-sm mb-6">{productCount} products</p>
 
       {/* Category */}
       <Section id="category" title="Category">
@@ -62,9 +62,9 @@ const FilterSidebar = ({ filters, onChange, onClear, productCount }) => {
                 value={cat}
                 checked={filters.category === cat}
                 onChange={() => onChange('category', filters.category === cat ? '' : cat)}
-                className="w-4 h-4 accent-brand-500 cursor-pointer"
+                className="w-4 h-4 accent-neutral-900 cursor-pointer"
               />
-              <span className="text-white/60 group-hover:text-white transition-colors text-sm">
+              <span className="text-neutral-600 group-hover:text-neutral-900 transition-colors text-sm">
                 {cat}
               </span>
             </label>
@@ -82,8 +82,8 @@ const FilterSidebar = ({ filters, onChange, onClear, productCount }) => {
               onClick={() => onChange('size', filters.size === size ? '' : size)}
               className={`w-10 h-10 rounded-lg text-sm font-medium transition-all duration-200 border
                 ${filters.size === size
-                  ? 'bg-brand-600 border-brand-500 text-white shadow-brand'
-                  : 'border-white/10 text-white/50 hover:border-brand-500 hover:text-white'
+                  ? 'bg-neutral-950 border-neutral-950 text-white'
+                  : 'border-neutral-200 text-neutral-600 hover:border-brand-500 hover:text-neutral-900'
                 }`}
             >
               {size}

@@ -26,10 +26,30 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+// Serve static uploads if fallback local storage is used
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// In development allow any localhost port (Vite may shift from 5173 → 5174 etc.)
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [process.env.CLIENT_URL].filter(Boolean)
+  : [
+      process.env.CLIENT_URL,
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+      'http://localhost:3000',
+    ].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    credentials: true, // allow cookies cross-origin
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    },
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
@@ -59,6 +79,6 @@ const server = app.listen(PORT, () => {
 
 // Handle unhandled promise rejections gracefully
 process.on('unhandledRejection', (err) => {
-  console.error(`❌  Unhandled Rejection: ${err.message}`);
+  console.error(`❌  Unhandled Rejection:`, err);
   server.close(() => process.exit(1));
 });

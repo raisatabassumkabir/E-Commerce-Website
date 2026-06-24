@@ -32,12 +32,12 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
       {/* Modal */}
       <div className={`relative w-full ${sizes[size]} glass rounded-2xl shadow-brand-lg animate-scale-in max-h-[90vh] flex flex-col`}>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <h2 className="text-xl font-semibold text-white">{title}</h2>
+        <div className="flex items-center justify-between p-6 border-b border-neutral-200/80">
+          <h2 className="text-xl font-semibold text-neutral-900">{title}</h2>
           <button
             id="modal-close-btn"
             onClick={onClose}
-            className="p-2 rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-xl text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
           >
             <X size={20} />
           </button>

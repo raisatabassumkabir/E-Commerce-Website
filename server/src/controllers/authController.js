@@ -88,7 +88,13 @@ const updateProfile = asyncHandler(async (req, res, next) => {
 
   if (name) user.name = name;
   if (email) user.email = email;
-  if (req.file) user.avatar = req.file.path; // Cloudinary URL
+  
+  if (req.file) {
+    const isLocal = !req.file.path.startsWith('http');
+    user.avatar = isLocal 
+      ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` 
+      : req.file.path;
+  }
 
   await user.save();
 

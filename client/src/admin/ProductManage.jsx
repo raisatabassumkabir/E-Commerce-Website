@@ -55,6 +55,7 @@ const ProductManage = () => {
   const [form, setForm] = useState(emptyForm);
   const [restockCount, setRestockCount] = useState('');
   const [images, setImages] = useState([]);
+  const [existingImages, setExistingImages] = useState([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [filterLowStock, setFilterLowStock] = useState(false);
@@ -82,6 +83,7 @@ const ProductManage = () => {
     setEditingProduct(null);
     setForm(emptyForm);
     setImages([]);
+    setExistingImages([]);
     setModalOpen(true);
   };
 
@@ -103,6 +105,7 @@ const ProductManage = () => {
       isPublished: product.isPublished !== false,
     });
     setImages([]);
+    setExistingImages(product.images || []);
     setModalOpen(true);
   };
 
@@ -129,7 +132,14 @@ const ProductManage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (form.sizes.length === 0) { toast.error('Select at least one size'); return; }
-    if (!editingProduct && images.length === 0) { toast.error('At least one image is required'); return; }
+    if (editingProduct && existingImages.length === 0 && images.length === 0) {
+      toast.error('At least one image is required');
+      return;
+    }
+    if (!editingProduct && images.length === 0) {
+      toast.error('At least one image is required');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -143,6 +153,11 @@ const ProductManage = () => {
           fd.append(k, v);
         }
       });
+
+      if (editingProduct) {
+        fd.append('existingImages', JSON.stringify(existingImages));
+      }
+
       images.forEach((img) => fd.append('images', img));
 
       if (editingProduct) {
@@ -395,7 +410,7 @@ const ProductManage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Title */}
             <div className="md:col-span-2">
-              <label className="label">Title *</label>
+              <label className="text-neutral-700 text-sm font-medium mb-1 block">Product Name *</label>
               <input
                 id="product-title"
                 name="title"
@@ -409,7 +424,7 @@ const ProductManage = () => {
 
             {/* Description */}
             <div className="md:col-span-2">
-              <label className="label">Description *</label>
+              <label className="text-neutral-700 text-sm font-medium mb-1 block">Description *</label>
               <textarea
                 id="product-desc"
                 name="description"
@@ -424,7 +439,7 @@ const ProductManage = () => {
 
             {/* Price */}
             <div>
-              <label className="label">Price ($) *</label>
+              <label className="text-neutral-700 text-sm font-medium mb-1 block">Price ($) *</label>
               <input
                 id="product-price"
                 name="price"
@@ -441,7 +456,9 @@ const ProductManage = () => {
 
             {/* Compare Price */}
             <div>
-              <label className="label">Compare Price ($) <span className="text-white/30 text-xs">(original / sale)</span></label>
+              <label className="text-neutral-700 text-sm font-medium mb-1 block">
+                Compare Price ($) <span className="text-neutral-400 text-xs">(original / sale)</span>
+              </label>
               <input
                 id="product-compare-price"
                 name="comparePrice"
@@ -457,7 +474,7 @@ const ProductManage = () => {
 
             {/* Category */}
             <div>
-              <label className="label">Category *</label>
+              <label className="text-neutral-700 text-sm font-medium mb-1 block">Category *</label>
               <select
                 id="product-category"
                 name="category"
@@ -466,34 +483,34 @@ const ProductManage = () => {
                   handleChange(e);
                   setForm((p) => ({ ...p, subcategory: '' })); // reset subcategory
                 }}
-                className="input"
+                className="input text-neutral-900 bg-white"
               >
                 {CATEGORIES.map((c) => (
-                  <option key={c} value={c} className="bg-dark-800">{c}</option>
+                  <option key={c} value={c} className="text-neutral-900 bg-white">{c}</option>
                 ))}
               </select>
             </div>
 
             {/* Subcategory */}
             <div>
-              <label className="label">Subcategory</label>
+              <label className="text-neutral-700 text-sm font-medium mb-1 block">Subcategory</label>
               <select
                 id="product-subcategory"
                 name="subcategory"
                 value={form.subcategory}
                 onChange={handleChange}
-                className="input"
+                className="input text-neutral-900 bg-white"
               >
-                <option value="" className="bg-dark-800">None</option>
+                <option value="" className="text-neutral-900 bg-white">None</option>
                 {(SUBCATEGORY_MAP[form.category] || []).map((sub) => (
-                  <option key={sub} value={sub} className="bg-dark-800">{sub}</option>
+                  <option key={sub} value={sub} className="text-neutral-900 bg-white">{sub}</option>
                 ))}
               </select>
             </div>
 
             {/* Brand */}
             <div>
-              <label className="label">Brand</label>
+              <label className="text-neutral-700 text-sm font-medium mb-1 block">Brand</label>
               <input
                 id="product-brand"
                 name="brand"
@@ -506,10 +523,10 @@ const ProductManage = () => {
 
             {/* Inventory Count — admin only field */}
             <div>
-              <label className="label flex items-center gap-2">
-                <Package size={14} className="text-brand-400" />
+              <label className="text-neutral-700 text-sm font-medium mb-1 flex items-center gap-2">
+                <Package size={14} className="text-brand-500" />
                 Inventory Count *
-                <span className="text-white/30 text-xs">(admin only)</span>
+                <span className="text-neutral-400 text-xs">(admin only)</span>
               </label>
               <input
                 id="product-inventory"
@@ -524,8 +541,8 @@ const ProductManage = () => {
               />
               {form.inventoryCount !== '' && (
                 <p className={`text-xs mt-1 font-medium ${
-                  Number(form.inventoryCount) === 0 ? 'text-red-400' :
-                  Number(form.inventoryCount) <= 5 ? 'text-yellow-400' : 'text-emerald-400'
+                  Number(form.inventoryCount) === 0 ? 'text-red-600' :
+                  Number(form.inventoryCount) <= 5 ? 'text-yellow-600' : 'text-emerald-600'
                 }`}>
                   {Number(form.inventoryCount) === 0 ? '⚠ Out of Stock — product will be greyed out'
                    : Number(form.inventoryCount) <= 5 ? `⚡ Low Stock — customers will see "Low Stock" badge`
@@ -536,7 +553,9 @@ const ProductManage = () => {
 
             {/* Tags */}
             <div className="md:col-span-2">
-              <label className="label">Tags <span className="text-white/30 text-xs">(comma separated)</span></label>
+              <label className="text-neutral-700 text-sm font-medium mb-1 block">
+                Tags <span className="text-neutral-400 text-xs">(comma separated)</span>
+              </label>
               <input
                 id="product-tags"
                 name="tags"
@@ -548,24 +567,87 @@ const ProductManage = () => {
             </div>
           </div>
 
+          {/* Product Images */}
+          <div>
+            <label className="text-neutral-700 text-sm font-medium mb-2 block">
+              Product Images * <span className="text-neutral-400 text-xs">(max 6, JPG/PNG/WebP, 5MB each)</span>
+            </label>
+
+            <div className="flex flex-wrap gap-3 items-center mb-3">
+              {/* Existing Images preview */}
+              {editingProduct && existingImages.map((img) => (
+                <div key={img.publicId} className="h-20 w-20 border border-neutral-200 relative group rounded-lg overflow-hidden flex-shrink-0">
+                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setExistingImages((prev) => prev.filter((item) => item.publicId !== img.publicId))}
+                    className="absolute top-1 right-1 bg-neutral-900/80 text-white rounded-full p-1 hover:bg-neutral-900 transition-colors flex items-center justify-center cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+
+              {/* New Images preview */}
+              {images.map((img, i) => (
+                <div key={i} className="h-20 w-20 border border-neutral-200 relative group rounded-lg overflow-hidden flex-shrink-0">
+                  <img src={URL.createObjectURL(img)} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="absolute top-1 right-1 bg-neutral-900/80 text-white rounded-full p-1 hover:bg-neutral-900 transition-colors flex items-center justify-center cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+
+              {/* Upload Dropzone */}
+              {(existingImages.length + images.length) < 6 && (
+                <label
+                  htmlFor="product-images-input"
+                  className="h-20 flex-1 min-w-[150px] border-2 border-dashed border-neutral-200 rounded-lg flex items-center justify-center gap-2 cursor-pointer hover:border-neutral-900 transition-colors bg-neutral-50/50 hover:bg-neutral-50"
+                >
+                  <ImagePlus size={18} className="text-neutral-500" />
+                  <span className="text-xs text-neutral-500 font-medium">+ Add Image or Drag & Drop</span>
+                </label>
+              )}
+            </div>
+
+            <input
+              id="product-images-input"
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const selectedFiles = Array.from(e.target.files);
+                const limit = 6 - (existingImages.length + images.length);
+                setImages((prev) => [...prev, ...selectedFiles.slice(0, limit)]);
+              }}
+            />
+          </div>
+
           {/* Sizes */}
           <div>
-            <label className="label">Sizes * <span className="text-white/30 text-xs">({form.sizes.length} selected)</span></label>
-            <div className="flex flex-wrap gap-2 mt-1">
+            <label className="text-neutral-700 text-sm font-medium mb-1 block">
+              Sizes * <span className="text-neutral-400 text-xs">({form.sizes.length} selected)</span>
+            </label>
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 mt-1">
               {ALL_SIZES.map((size) => (
-                <button
+                <label
                   key={size}
-                  type="button"
-                  id={`form-size-${size}`}
-                  onClick={() => toggleSize(size)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                    form.sizes.includes(size)
-                      ? 'bg-brand-600 border-brand-500 text-white shadow-brand'
-                      : 'border-white/10 text-white/50 hover:border-brand-500 hover:text-white'
-                  }`}
+                  className="flex items-center justify-center border border-neutral-200 p-2 cursor-pointer text-neutral-800 has-[:checked]:bg-neutral-950 has-[:checked]:text-white transition-all"
                 >
-                  {size}
-                </button>
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    value={size}
+                    checked={form.sizes.includes(size)}
+                    onChange={() => toggleSize(size)}
+                  />
+                  <span className="text-xs font-semibold uppercase">{size}</span>
+                </label>
               ))}
             </div>
           </div>
@@ -581,7 +663,7 @@ const ProductManage = () => {
                 onChange={handleChange}
                 className="w-4 h-4 accent-brand-500"
               />
-              <span className="text-white/70 text-sm">Featured on homepage</span>
+              <span className="text-neutral-700 text-sm">Featured on homepage</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -592,49 +674,11 @@ const ProductManage = () => {
                 onChange={handleChange}
                 className="w-4 h-4 accent-brand-500"
               />
-              <span className="text-white/70 text-sm">Published (visible to customers)</span>
+              <span className="text-neutral-700 text-sm">Published (visible to customers)</span>
             </label>
           </div>
 
-          {/* Image Upload */}
-          {!editingProduct && (
-            <div>
-              <label className="label">
-                Product Images * <span className="text-white/30 text-xs">(max 6, JPG/PNG/WebP, 5MB each)</span>
-              </label>
-              <label
-                htmlFor="product-images-input"
-                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 cursor-pointer transition-colors ${
-                  images.length > 0 ? 'border-brand-500/50 bg-brand-900/10' : 'border-white/10 hover:border-brand-500/50'
-                }`}
-              >
-                <ImagePlus size={28} className={images.length > 0 ? 'text-brand-400' : 'text-white/30'} />
-                <p className="text-sm mt-2 text-white/50">
-                  {images.length > 0 ? `${images.length} image(s) selected` : 'Click or drag images here'}
-                </p>
-                {images.length > 0 && (
-                  <div className="flex gap-2 mt-3 flex-wrap justify-center">
-                    {images.map((img, i) => (
-                      <img
-                        key={i}
-                        src={URL.createObjectURL(img)}
-                        alt=""
-                        className="w-14 h-16 object-cover rounded-lg"
-                      />
-                    ))}
-                  </div>
-                )}
-              </label>
-              <input
-                id="product-images-input"
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => setImages(Array.from(e.target.files).slice(0, 6))}
-              />
-            </div>
-          )}
+
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-2">
@@ -673,7 +717,7 @@ const ProductManage = () => {
                 className="w-14 h-16 object-cover rounded-lg bg-dark-700 flex-shrink-0"
               />
               <div>
-                <p className="text-white font-medium line-clamp-2 text-sm">{restockTarget.title}</p>
+                <p className="text-neutral-900 font-medium line-clamp-2 text-sm">{restockTarget.title}</p>
                 <div className="mt-1">
                   <StockBadge count={restockTarget.inventoryCount} />
                 </div>
@@ -702,7 +746,7 @@ const ProductManage = () => {
                    : `✓ ${restockCount} units — In Stock`}
                 </p>
               )}
-              <p className="text-white/30 text-xs mt-1">
+              <p className="text-neutral-500 text-xs mt-1">
                 Current: {restockTarget.inventoryCount} units → New: {restockCount || 0} units
                 {Number(restockCount) > restockTarget.inventoryCount && (
                   <span className="text-emerald-400 ml-2">

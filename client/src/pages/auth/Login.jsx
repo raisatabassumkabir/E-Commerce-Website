@@ -40,8 +40,8 @@ const Login = () => {
             </div>
             <span className="font-display font-bold text-2xl gradient-text">ThreadHaus</span>
           </Link>
-          <h1 className="heading-display text-3xl text-white mb-2">Welcome back</h1>
-          <p className="text-white/40">Sign in to continue shopping</p>
+          <h1 className="heading-display text-3xl text-neutral-900 mb-2">Welcome back</h1>
+          <p className="text-neutral-500">Sign in to continue shopping</p>
         </div>
 
         {/* Form */}
@@ -78,7 +78,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-900 transition-colors"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -95,9 +95,9 @@ const Login = () => {
           </button>
         </form>
 
-        <p className="text-center text-white/40 mt-6 text-sm">
+        <p className="text-center text-neutral-500 mt-6 text-sm">
           Don&apos;t have an account?{' '}
-          <Link id="login-register-link" to="/register" className="text-brand-400 hover:text-brand-300 transition-colors font-medium">
+          <Link id="login-register-link" to="/register" className="text-brand-600 hover:text-brand-500 transition-colors font-medium">
             Create one free
           </Link>
         </p>

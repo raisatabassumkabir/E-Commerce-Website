@@ -83,8 +83,8 @@ const App = () => {
             <div className="min-h-screen flex items-center justify-center text-center p-4">
               <div>
                 <p className="text-8xl font-bold gradient-text font-display mb-4">403</p>
-                <h1 className="text-white text-2xl font-semibold mb-2">Access Denied</h1>
-                <p className="text-white/40 mb-8">You don't have permission to view this page.</p>
+                <h1 className="text-neutral-900 text-2xl font-semibold mb-2">Access Denied</h1>
+                <p className="text-neutral-500 mb-8">You don't have permission to view this page.</p>
                 <a href="/" className="btn-primary btn-md rounded-xl inline-flex">Go Home</a>
               </div>
             </div>
@@ -96,8 +96,8 @@ const App = () => {
             <div className="min-h-screen flex items-center justify-center text-center p-4">
               <div>
                 <p className="text-8xl font-bold gradient-text font-display mb-4">404</p>
-                <h1 className="text-white text-2xl font-semibold mb-2">Page Not Found</h1>
-                <p className="text-white/40 mb-8">The page you're looking for doesn't exist.</p>
+                <h1 className="text-neutral-900 text-2xl font-semibold mb-2">Page Not Found</h1>
+                <p className="text-neutral-500 mb-8">The page you're looking for doesn't exist.</p>
                 <a href="/" className="btn-primary btn-md rounded-xl inline-flex">Go Home</a>
               </div>
             </div>

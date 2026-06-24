@@ -61,9 +61,9 @@ const Cart = () => {
     return (
       <div className="container-page py-24 text-center animate-fade-in">
         <div className="max-w-md mx-auto">
-          <ShoppingBag size={80} className="mx-auto text-white/10 mb-6" strokeWidth={1} />
-          <h1 className="heading-display text-3xl mb-4">Your Cart is Empty</h1>
-          <p className="text-white/40 mb-8">Looks like you haven't added anything yet. Let's fix that.</p>
+          <ShoppingBag size={80} className="mx-auto text-neutral-200 mb-6" strokeWidth={1} />
+          <h1 className="heading-display text-3xl mb-4 text-neutral-900">Your Cart is Empty</h1>
+          <p className="text-neutral-500 mb-8">Looks like you haven't added anything yet. Let's fix that.</p>
           <Link id="cart-empty-shop-link" to="/shop" className="btn-primary btn-lg rounded-2xl inline-flex">
             Start Shopping <ArrowRight size={18} />
           </Link>
@@ -88,49 +88,51 @@ const Cart = () => {
                 <img
                   src={item.image}
                   alt={item.title}
-                  className="w-24 h-32 md:w-28 md:h-36 object-cover rounded-xl flex-shrink-0 bg-dark-700 hover:opacity-90 transition-opacity"
+                  className="w-24 h-32 md:w-28 md:h-36 object-cover rounded-xl flex-shrink-0 bg-neutral-100 hover:opacity-90 transition-opacity"
                 />
               </Link>
               <div className="flex-1 min-w-0">
                 <Link to={`/products/${item.product}`}>
-                  <h3 className="text-white font-medium hover:text-brand-300 transition-colors leading-snug line-clamp-2">
+                  <h3 className="text-neutral-800 font-medium hover:text-brand-600 transition-colors leading-snug line-clamp-2">
                     {item.title}
                   </h3>
                 </Link>
                 <div className="flex flex-wrap items-center gap-3 mt-1">
-                  <span className="badge-brand text-xs">Size: {item.size}</span>
-                  {item.color && <span className="text-white/40 text-xs">{item.color}</span>}
+                  <span className="text-neutral-500 text-xs">Size: {item.size}</span>
+                  {item.color && <span className="text-neutral-500 text-xs">· {item.color}</span>}
                 </div>
-                <p className="text-brand-400 font-bold text-lg mt-2">${item.price.toFixed(2)}</p>
+                <p className="text-neutral-900 font-bold text-lg mt-2">${item.price.toFixed(2)}</p>
 
                 <div className="flex items-center justify-between mt-4">
                   {/* Qty */}
-                  <div className="flex items-center gap-2 glass-sm rounded-xl p-1">
+                  <div className="flex border border-neutral-200 h-8 w-24 items-center justify-between">
                     <button
                       id={`cart-qty-dec-${item.product}-${item.size}`}
+                      type="button"
                       onClick={() => updateQuantity(item.product, item.size, item.color, item.quantity - 1)}
-                      className="w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                      className="text-neutral-600 px-2 hover:text-neutral-900"
                     >
                       <Minus size={14} />
                     </button>
-                    <span className="text-white font-medium w-8 text-center">{item.quantity}</span>
+                    <span className="text-neutral-900 font-semibold text-center text-sm w-8">{item.quantity}</span>
                     <button
                       id={`cart-qty-inc-${item.product}-${item.size}`}
+                      type="button"
                       onClick={() => updateQuantity(item.product, item.size, item.color, item.quantity + 1)}
-                      className="w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                      className="text-neutral-600 px-2 hover:text-neutral-900"
                     >
                       <Plus size={14} />
                     </button>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className="text-white/50 font-medium text-sm">
+                    <span className="text-neutral-600 font-medium text-sm">
                       ${(item.price * item.quantity).toFixed(2)}
                     </span>
                     <button
                       id={`cart-remove-${item.product}-${item.size}`}
                       onClick={() => removeItem(item.product, item.size, item.color)}
-                      className="p-2 text-white/30 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                      className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -144,7 +146,7 @@ const Cart = () => {
           <div className="glass-sm rounded-2xl p-5">
             <div className="flex gap-3">
               <div className="relative flex-1">
-                <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input id="promo-code-input" type="text" placeholder="Promo code" className="input pl-9" />
               </div>
               <button id="promo-apply-btn" className="btn-secondary btn-md rounded-xl">Apply</button>
@@ -155,29 +157,29 @@ const Cart = () => {
         {/* Order Summary */}
         <div className="h-fit">
           <div className="glass rounded-2xl p-6 space-y-4 sticky top-24">
-            <h2 className="text-white font-semibold text-lg">Order Summary</h2>
+            <h2 className="text-neutral-900 font-semibold text-lg">Order Summary</h2>
             <div className="divider" />
             <div className="space-y-3 text-sm">
-              <div className="flex justify-between text-white/60">
+              <div className="flex justify-between text-neutral-600">
                 <span>Subtotal ({items.length} items)</span>
                 <span>${subtotal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-white/60">
+              <div className="flex justify-between text-neutral-600">
                 <span>Shipping</span>
-                <span>{shipping === 0 ? <span className="text-emerald-400 font-medium">Free</span> : `$${shipping.toFixed(2)}`}</span>
+                <span>{shipping === 0 ? <span className="text-emerald-500 font-medium">Free</span> : `$${shipping.toFixed(2)}`}</span>
               </div>
-              <div className="flex justify-between text-white/60">
+              <div className="flex justify-between text-neutral-600">
                 <span>Est. Tax (8%)</span>
                 <span>${tax.toFixed(2)}</span>
               </div>
             </div>
             <div className="divider" />
-            <div className="flex justify-between text-white font-bold text-lg">
+            <div className="flex justify-between text-neutral-900 font-bold text-lg">
               <span>Total</span>
               <span className="gradient-text">${total.toFixed(2)}</span>
             </div>
             {shipping > 0 && (
-              <p className="text-white/30 text-xs text-center">Add ${(100 - subtotal).toFixed(2)} more for free shipping</p>
+              <p className="text-neutral-500 text-xs text-center">Add ${(100 - subtotal).toFixed(2)} more for free shipping</p>
             )}
             <button
               id="checkout-btn"
@@ -190,7 +192,7 @@ const Cart = () => {
             <button
               id="cart-clear-all"
               onClick={clearCart}
-              className="text-white/30 hover:text-red-400 text-xs w-full text-center transition-colors"
+              className="text-neutral-400 hover:text-red-600 text-xs w-full text-center transition-colors"
             >
               Clear cart
             </button>

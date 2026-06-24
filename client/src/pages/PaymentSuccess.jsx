@@ -33,7 +33,7 @@ const PaymentSuccess = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Spinner size="xl" className="mx-auto mb-4" />
-          <p className="text-white/50">Confirming your payment...</p>
+          <p className="text-neutral-500">Confirming your payment...</p>
         </div>
       </div>
     );
@@ -53,7 +53,7 @@ const PaymentSuccess = () => {
         <h1 className="heading-display text-4xl md:text-5xl mb-4">
           Payment <span className="gradient-text">Successful!</span>
         </h1>
-        <p className="text-white/50 text-lg mb-12">
+        <p className="text-neutral-500 text-lg mb-12">
           Thank you for your order. We've sent a confirmation to your email.
         </p>
 
@@ -61,7 +61,7 @@ const PaymentSuccess = () => {
         {order && (
           <div className="glass rounded-2xl p-8 text-left mb-10 space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-white font-semibold text-lg">Order Details</h2>
+              <h2 className="text-neutral-900 font-semibold text-lg">Order Details</h2>
               <span className="badge-green">Paid</span>
             </div>
             <div className="divider" />
@@ -73,12 +73,12 @@ const PaymentSuccess = () => {
                   <img
                     src={item.image}
                     alt={item.title}
-                    className="w-16 h-20 object-cover rounded-xl bg-dark-700 flex-shrink-0"
+                    className="w-16 h-20 object-cover rounded-xl bg-neutral-100 flex-shrink-0"
                   />
                   <div className="flex-1">
-                    <p className="text-white font-medium text-sm">{item.title}</p>
-                    <p className="text-white/40 text-xs">Size: {item.size} · Qty: {item.quantity}</p>
-                    <p className="text-brand-400 font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
+                    <p className="text-neutral-800 font-medium text-sm">{item.title}</p>
+                    <p className="text-neutral-500 text-xs">Size: {item.size} · Qty: {item.quantity}</p>
+                    <p className="text-neutral-900 font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
                   </div>
                 </div>
               ))}
@@ -88,17 +88,17 @@ const PaymentSuccess = () => {
 
             {/* Totals */}
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-white/60">
+              <div className="flex justify-between text-neutral-600">
                 <span>Items</span><span>${order.itemsPrice?.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-white/60">
+              <div className="flex justify-between text-neutral-600">
                 <span>Shipping</span>
                 <span>{order.shippingPrice === 0 ? 'Free' : `$${order.shippingPrice?.toFixed(2)}`}</span>
               </div>
-              <div className="flex justify-between text-white/60">
+              <div className="flex justify-between text-neutral-600">
                 <span>Tax</span><span>${order.taxPrice?.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-white font-bold text-base pt-2 border-t border-white/10">
+              <div className="flex justify-between text-neutral-900 font-bold text-base pt-2 border-t border-neutral-200">
                 <span>Total</span><span className="gradient-text">${order.totalPrice?.toFixed(2)}</span>
               </div>
             </div>
@@ -106,9 +106,9 @@ const PaymentSuccess = () => {
             {/* Shipping address */}
             {order.shippingAddress && (
               <div className="glass-sm rounded-xl p-4">
-                <p className="text-white/40 text-xs uppercase tracking-wider mb-2">Shipping To</p>
-                <p className="text-white text-sm">{order.shippingAddress.fullName}</p>
-                <p className="text-white/60 text-sm">
+                <p className="text-neutral-500 text-xs uppercase tracking-wider mb-2">Shipping To</p>
+                <p className="text-neutral-800 text-sm">{order.shippingAddress.fullName}</p>
+                <p className="text-neutral-600 text-sm">
                   {order.shippingAddress.street}, {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
                 </p>
               </div>

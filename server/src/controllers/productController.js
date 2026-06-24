@@ -122,7 +122,13 @@ const createProduct = asyncHandler(async (req, res, next) => {
   if (body.inventoryCount !== undefined) body.inventoryCount = Number(body.inventoryCount);
 
   const images = req.files
-    ? req.files.map((f) => ({ url: f.path, publicId: f.filename, alt: body.title }))
+    ? req.files.map((f) => {
+        const isLocal = !f.path.startsWith('http');
+        const url = isLocal 
+          ? `${req.protocol}://${req.get('host')}/uploads/${f.filename}` 
+          : f.path;
+        return { url, publicId: f.filename, alt: body.title };
+      })
     : [];
 
   if (images.length === 0) {
@@ -146,15 +152,44 @@ const updateProduct = asyncHandler(async (req, res, next) => {
   if (typeof body.tags === 'string') body.tags = JSON.parse(body.tags);
   if (body.inventoryCount !== undefined) body.inventoryCount = Number(body.inventoryCount);
 
-  // Append new uploaded images to existing
-  if (req.files && req.files.length > 0) {
-    const newImages = req.files.map((f) => ({
-      url: f.path,
-      publicId: f.filename,
-      alt: body.title || product.title,
-    }));
-    body.images = [...product.images, ...newImages];
+  // Existing images list from frontend
+  let baseImages = product.images;
+  if (body.existingImages !== undefined) {
+    baseImages = typeof body.existingImages === 'string'
+      ? JSON.parse(body.existingImages)
+      : body.existingImages;
   }
+
+  // Delete removed images from Cloudinary
+  const removedImages = product.images.filter(
+    (img) => !baseImages.some((i) => i.publicId === img.publicId)
+  );
+  if (removedImages.length > 0) {
+    const deletePromises = removedImages.map((img) =>
+      cloudinary.uploader.destroy(img.publicId)
+    );
+    await Promise.allSettled(deletePromises);
+  }
+
+  // Append new uploaded images to baseImages
+  if (req.files && req.files.length > 0) {
+    const newImages = req.files.map((f) => {
+      const isLocal = !f.path.startsWith('http');
+      const url = isLocal 
+        ? `${req.protocol}://${req.get('host')}/uploads/${f.filename}` 
+        : f.path;
+      return {
+        url,
+        publicId: f.filename,
+        alt: body.title || product.title,
+      };
+    });
+    body.images = [...baseImages, ...newImages];
+  } else {
+    body.images = baseImages;
+  }
+
+  delete body.existingImages;
 
   Object.assign(product, body);
   const updated = await product.save();

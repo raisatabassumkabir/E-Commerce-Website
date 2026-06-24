@@ -39,8 +39,8 @@ const Orders = () => {
 
       {orders.length === 0 ? (
         <div className="text-center py-24 glass rounded-2xl">
-          <Package size={60} className="mx-auto text-white/10 mb-4" strokeWidth={1} />
-          <p className="text-white/40 text-lg mb-6">You haven't placed any orders yet</p>
+          <Package size={60} className="mx-auto text-neutral-200 mb-4" strokeWidth={1} />
+          <p className="text-neutral-500 text-lg mb-6">You haven't placed any orders yet</p>
           <Link id="orders-empty-shop-link" to="/shop" className="btn-primary btn-md rounded-xl inline-flex">
             Start Shopping <ArrowRight size={16} />
           </Link>
@@ -52,8 +52,8 @@ const Orders = () => {
               {/* Header */}
               <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
                 <div>
-                  <p className="text-white/40 text-xs uppercase tracking-wider mb-1">Order #{order._id.slice(-8).toUpperCase()}</p>
-                  <p className="text-white/50 text-sm">{new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                  <p className="text-neutral-500 text-xs uppercase tracking-wider mb-1">Order #{order._id.slice(-8).toUpperCase()}</p>
+                  <p className="text-neutral-600 text-sm">{new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={`${STATUS_BADGE[order.deliveryStatus] || 'badge'} flex items-center gap-1.5`}>
@@ -73,18 +73,18 @@ const Orders = () => {
                     <img
                       src={item.image}
                       alt={item.title}
-                      className="w-16 h-20 object-cover rounded-lg bg-dark-700"
+                      className="w-16 h-20 object-cover rounded-lg bg-neutral-100"
                     />
-                    <p className="text-white/40 text-[10px] text-center mt-1 w-16 truncate">{item.size}</p>
+                    <p className="text-neutral-500 text-[10px] text-center mt-1 w-16 truncate">{item.size}</p>
                   </div>
                 ))}
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-between border-t border-white/10 pt-4">
+              <div className="flex items-center justify-between border-t border-neutral-200 pt-4">
                 <div>
-                  <p className="text-white/40 text-xs">{order.orderItems.length} item{order.orderItems.length !== 1 ? 's' : ''}</p>
-                  <p className="text-white font-bold text-lg gradient-text">${order.totalPrice?.toFixed(2)}</p>
+                  <p className="text-neutral-500 text-xs">{order.orderItems.length} item{order.orderItems.length !== 1 ? 's' : ''}</p>
+                  <p className="text-neutral-900 font-bold text-lg gradient-text">${order.totalPrice?.toFixed(2)}</p>
                 </div>
                 <Link
                   id={`order-detail-${order._id}`}
