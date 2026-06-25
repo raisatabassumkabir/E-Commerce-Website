@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2, ImagePlus, Package, AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, ImagePlus, Package, AlertTriangle, RefreshCw, X, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../services/api';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
@@ -7,23 +7,47 @@ import toast from 'react-hot-toast';
 
 const CATEGORIES = ['Men', 'Women', 'Kids', 'Accessories', 'Footwear', 'Sale'];
 const ALL_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'One Size'];
+const FOOTWEAR_SIZES = ['6', '7', '8', '9', '10', '11', '12'];
 const SUBCATEGORY_MAP = {
-  Men: ['T-Shirts', 'Shirts', 'Hoodies', 'Jackets', 'Bottoms', 'Knitwear', 'Outerwear'],
-  Women: ['Tops', 'Dresses', 'Bottoms', 'Knitwear', 'Outerwear', 'Activewear'],
-  Kids: ['Tops', 'Bottoms', 'Outerwear', 'Sets'],
+  Men:         ['T-Shirts', 'Shirts', 'Hoodies', 'Jackets', 'Bottoms', 'Knitwear', 'Outerwear'],
+  Women:       ['Tops', 'Dresses', 'Bottoms', 'Knitwear', 'Outerwear', 'Activewear'],
+  Kids:        ['Tops', 'Bottoms', 'Outerwear', 'Sets'],
   Accessories: ['Bags', 'Scarves', 'Belts', 'Hats', 'Jewellery'],
-  Footwear: ['Sneakers', 'Boots', 'Sandals', 'Loafers', 'Heels'],
-  Sale: ['T-Shirts', 'Dresses', 'Outerwear', 'Accessories'],
+  Footwear:    ['Sneakers', 'Boots', 'Sandals', 'Loafers', 'Heels'],
+  Sale:        ['T-Shirts', 'Dresses', 'Outerwear', 'Accessories'],
 };
+
+const emptyVariant = () => ({
+  color: '',
+  hex:   '#000000',
+  image: '',
+  sizes: [],
+});
 
 const emptyForm = {
-  title: '', description: '', price: '', comparePrice: '', category: 'Men',
-  subcategory: '', brand: '', inventoryCount: '', sizes: [], tags: '',
-  colors: [{ name: 'Black', hex: '#000000' }], isFeatured: false, isPublished: true,
+  title:        '',
+  description:  '',
+  price:        '',
+  comparePrice: '',
+  category:     'Men',
+  subcategory:  '',
+  brand:        '',
+  tags:         '',
+  variants:     [],
+  isFeatured:   false,
+  isPublished:  true,
 };
 
-// Inventory status badge helper
-const StockBadge = ({ count }) => {
+// ── Helper: total stock for a product (from variants) ─────────────────────────
+const totalStock = (variants) =>
+  (variants || []).reduce(
+    (sum, v) => sum + (v.sizes || []).reduce((s, sz) => s + Number(sz.inventoryCount || 0), 0),
+    0
+  );
+
+// ── Stock badge ───────────────────────────────────────────────────────────────
+const StockBadge = ({ variants }) => {
+  const count = totalStock(variants);
   if (count === 0) {
     return (
       <span className="border border-red-200 bg-white text-red-600 text-xs px-2.5 py-1 font-medium rounded-full flex items-center gap-1 w-fit">
@@ -31,7 +55,7 @@ const StockBadge = ({ count }) => {
       </span>
     );
   }
-  if (count <= 5) {
+  if (count <= 10) {
     return (
       <span className="border border-yellow-200 bg-white text-yellow-600 text-xs px-2.5 py-1 font-medium rounded-full w-fit inline-block">
         {count} UNITS LEFT
@@ -45,32 +69,172 @@ const StockBadge = ({ count }) => {
   );
 };
 
+// ── VariantRow: one colour accordion ─────────────────────────────────────────
+const VariantRow = ({ variant, index, category, onChange, onRemove }) => {
+  const [open, setOpen] = useState(true);
+  const sizes = category === 'Footwear' ? FOOTWEAR_SIZES : ALL_SIZES;
+
+  const toggleSize = (size) => {
+    const current = variant.sizes || [];
+    const exists = current.find((s) => s.size === size);
+    onChange(index, {
+      ...variant,
+      sizes: exists
+        ? current.filter((s) => s.size !== size)
+        : [...current, { size, inventoryCount: 0 }],
+    });
+  };
+
+  const setInventory = (size, count) => {
+    onChange(index, {
+      ...variant,
+      sizes: (variant.sizes || []).map((s) =>
+        s.size === size ? { ...s, inventoryCount: Number(count) || 0 } : s
+      ),
+    });
+  };
+
+  const variantTotal = (variant.sizes || []).reduce((s, sz) => s + Number(sz.inventoryCount || 0), 0);
+
+  return (
+    <div className="border border-neutral-200 rounded-xl overflow-hidden">
+      {/* Variant header */}
+      <div className="flex items-center gap-3 px-4 py-3 bg-neutral-50">
+        {/* Colour picker */}
+        <input
+          type="color"
+          value={variant.hex || '#000000'}
+          onChange={(e) => onChange(index, { ...variant, hex: e.target.value })}
+          className="w-7 h-7 rounded-full border border-neutral-200 cursor-pointer p-0.5 bg-white"
+          title="Pick colour swatch"
+        />
+
+        {/* Colour name */}
+        <input
+          type="text"
+          value={variant.color}
+          onChange={(e) => onChange(index, { ...variant, color: e.target.value })}
+          placeholder="Colour name, e.g. Floral Pink"
+          className="input flex-1 py-1.5 text-sm"
+          required
+        />
+
+        {/* Total inventory badge */}
+        <span className="text-[10px] font-semibold text-neutral-500 whitespace-nowrap">
+          {variantTotal} units
+        </span>
+
+        {/* Expand/collapse */}
+        <button type="button" onClick={() => setOpen((o) => !o)} className="p-1 text-neutral-400 hover:text-neutral-700">
+          {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        </button>
+
+        {/* Remove variant */}
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          className="p-1 text-neutral-400 hover:text-red-500 transition-colors"
+          title="Remove this colour"
+        >
+          <X size={15} />
+        </button>
+      </div>
+
+      {open && (
+        <div className="px-4 py-4 space-y-4">
+          {/* Optional per-variant image URL */}
+          <div>
+            <label className="text-neutral-600 text-xs font-medium mb-1 block">
+              Variant Image URL <span className="text-neutral-400">(optional — overrides gallery for this colour)</span>
+            </label>
+            <input
+              type="url"
+              value={variant.image || ''}
+              onChange={(e) => onChange(index, { ...variant, image: e.target.value })}
+              placeholder="https://..."
+              className="input text-sm py-1.5"
+            />
+          </div>
+
+          {/* Size selector */}
+          <div>
+            <p className="text-neutral-600 text-xs font-medium mb-2">
+              Sizes & Inventory <span className="text-neutral-400">({(variant.sizes || []).length} selected)</span>
+            </p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {sizes.map((size) => {
+                const active = (variant.sizes || []).find((s) => s.size === size);
+                return (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => toggleSize(size)}
+                    className={`h-8 px-3 text-xs font-semibold border transition-all ${
+                      active
+                        ? 'bg-neutral-950 text-white border-neutral-950'
+                        : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-900'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Inventory per selected size */}
+            {(variant.sizes || []).length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {(variant.sizes || []).map((sz) => (
+                  <div key={sz.size} className="flex flex-col gap-1">
+                    <label className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
+                      {sz.size}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={sz.inventoryCount}
+                      onChange={(e) => setInventory(sz.size, e.target.value)}
+                      className="input py-1.5 text-sm text-center"
+                      placeholder="0"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Main Component ────────────────────────────────────────────────────────────
 const ProductManage = () => {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [restockModalOpen, setRestockModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [restockTarget, setRestockTarget] = useState(null);
-  const [form, setForm] = useState(emptyForm);
-  const [restockCount, setRestockCount] = useState('');
-  const [images, setImages] = useState([]);
-  const [existingImages, setExistingImages] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(null);
-  const [filterLowStock, setFilterLowStock] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [products,          setProducts]          = useState([]);
+  const [loading,           setLoading]           = useState(true);
+  const [modalOpen,         setModalOpen]         = useState(false);
+  const [restockModalOpen,  setRestockModalOpen]  = useState(false);
+  const [editingProduct,    setEditingProduct]    = useState(null);
+  const [restockTarget,     setRestockTarget]     = useState(null);
+  const [form,              setForm]              = useState(emptyForm);
+  const [images,            setImages]            = useState([]);
+  const [existingImages,    setExistingImages]    = useState([]);
+  const [saving,            setSaving]            = useState(false);
+  const [deleting,          setDeleting]          = useState(null);
+  const [filterLowStock,    setFilterLowStock]    = useState(false);
+  const [searchQuery,       setSearchQuery]       = useState('');
+  // Restock editing state (full variants copy)
+  const [restockVariants,   setRestockVariants]   = useState([]);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      // Admin endpoint — includes inventoryCount
       const params = new URLSearchParams({ limit: 100 });
       if (filterLowStock) params.set('lowStock', 'true');
-      if (searchQuery) params.set('keyword', searchQuery);
+      if (searchQuery)    params.set('keyword', searchQuery);
       const { data } = await api.get(`/products/admin/all?${params.toString()}`);
       setProducts(data.products);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load products');
     } finally {
       setLoading(false);
@@ -90,19 +254,17 @@ const ProductManage = () => {
   const openEdit = (product) => {
     setEditingProduct(product);
     setForm({
-      title: product.title,
-      description: product.description,
-      price: product.price,
+      title:        product.title,
+      description:  product.description,
+      price:        product.price,
       comparePrice: product.comparePrice || '',
-      category: product.category,
-      subcategory: product.subcategory || '',
-      brand: product.brand || '',
-      inventoryCount: product.inventoryCount,
-      sizes: product.sizes,
-      tags: (product.tags || []).join(', '),
-      colors: product.colors,
-      isFeatured: product.isFeatured,
-      isPublished: product.isPublished !== false,
+      category:     product.category,
+      subcategory:  product.subcategory || '',
+      brand:        product.brand || '',
+      tags:         (product.tags || []).join(', '),
+      variants:     product.variants || [],
+      isFeatured:   product.isFeatured,
+      isPublished:  product.isPublished !== false,
     });
     setImages([]);
     setExistingImages(product.images || []);
@@ -111,7 +273,7 @@ const ProductManage = () => {
 
   const openRestock = (product) => {
     setRestockTarget(product);
-    setRestockCount(product.inventoryCount);
+    setRestockVariants(JSON.parse(JSON.stringify(product.variants || [])));
     setRestockModalOpen(true);
   };
 
@@ -120,18 +282,37 @@ const ProductManage = () => {
     setForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const toggleSize = (size) => {
-    setForm((p) => ({
-      ...p,
-      sizes: p.sizes.includes(size)
-        ? p.sizes.filter((s) => s !== size)
-        : [...p.sizes, size],
-    }));
+  // Variant Builder callbacks
+  const handleVariantChange = (index, updated) => {
+    setForm((p) => {
+      const next = [...p.variants];
+      next[index] = updated;
+      return { ...p, variants: next };
+    });
+  };
+
+  const handleVariantRemove = (index) => {
+    setForm((p) => ({ ...p, variants: p.variants.filter((_, i) => i !== index) }));
+  };
+
+  const handleAddVariant = () => {
+    setForm((p) => ({ ...p, variants: [emptyVariant(), ...p.variants] }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (form.sizes.length === 0) { toast.error('Select at least one size'); return; }
+    if (form.variants.length === 0) {
+      toast.error('Add at least one colour variant');
+      return;
+    }
+    // Validate each variant has a name and at least one size
+    for (const v of form.variants) {
+      if (!v.color.trim()) { toast.error('Each variant needs a colour name'); return; }
+      if ((v.sizes || []).length === 0) {
+        toast.error(`Variant "${v.color}" needs at least one size`);
+        return;
+      }
+    }
     if (editingProduct && existingImages.length === 0 && images.length === 0) {
       toast.error('At least one image is required');
       return;
@@ -145,7 +326,7 @@ const ProductManage = () => {
     try {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => {
-        if (k === 'sizes' || k === 'colors') {
+        if (k === 'variants') {
           fd.append(k, JSON.stringify(v));
         } else if (k === 'tags') {
           fd.append(k, JSON.stringify(v.split(',').map((t) => t.trim()).filter(Boolean)));
@@ -157,7 +338,6 @@ const ProductManage = () => {
       if (editingProduct) {
         fd.append('existingImages', JSON.stringify(existingImages));
       }
-
       images.forEach((img) => fd.append('images', img));
 
       if (editingProduct) {
@@ -181,22 +361,16 @@ const ProductManage = () => {
     }
   };
 
+  // Restock: save the edited variants array
   const handleRestock = async () => {
-    if (restockCount === '' || Number(restockCount) < 0) {
-      toast.error('Enter a valid inventory count');
-      return;
-    }
     try {
       const { data } = await api.patch(`/products/${restockTarget._id}/inventory`, {
-        inventoryCount: Number(restockCount),
+        variants: restockVariants,
       });
       setProducts((p) =>
-        p.map((prod) => prod._id === restockTarget._id
-          ? { ...prod, inventoryCount: data.product.inventoryCount, isAvailable: data.product.isAvailable, stockStatus: data.product.stockStatus }
-          : prod
-        )
+        p.map((prod) => prod._id === restockTarget._id ? data.product : prod)
       );
-      toast.success(`Inventory updated → ${restockCount} units`, { style: { background: '#1a1a27', color: '#fff' } });
+      toast.success('Inventory updated!', { style: { background: '#1a1a27', color: '#fff' } });
       setRestockModalOpen(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update inventory');
@@ -217,7 +391,8 @@ const ProductManage = () => {
     }
   };
 
-  const lowStockCount = products.filter((p) => p.inventoryCount <= 5).length;
+  const lowStockCount = products.filter((p) => totalStock(p.variants) <= 10 && totalStock(p.variants) > 0).length;
+  const outOfStockCount = products.filter((p) => totalStock(p.variants) === 0).length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -229,6 +404,9 @@ const ProductManage = () => {
             {products.length} products total
             {lowStockCount > 0 && (
               <span className="ml-2 text-yellow-600 font-semibold">· {lowStockCount} low stock</span>
+            )}
+            {outOfStockCount > 0 && (
+              <span className="ml-2 text-red-600 font-semibold">· {outOfStockCount} out of stock</span>
             )}
           </p>
         </div>
@@ -282,9 +460,10 @@ const ProductManage = () => {
               <thead>
                 <tr className="border-b border-neutral-200 bg-neutral-50/50">
                   <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">IMAGE</th>
-                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">NAME/CATEGORY</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">NAME / CATEGORY</th>
                   <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">PRICE</th>
-                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">STOCK UNITS</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">VARIANTS</th>
+                  <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">STOCK</th>
                   <th className="text-left p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">STATUS</th>
                   <th className="text-right p-4 text-neutral-500 text-[11px] font-bold tracking-widest uppercase">ACTIONS</th>
                 </tr>
@@ -292,7 +471,7 @@ const ProductManage = () => {
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center p-12 text-neutral-400">
+                    <td colSpan={7} className="text-center p-12 text-neutral-400">
                       No products found
                     </td>
                   </tr>
@@ -302,10 +481,10 @@ const ProductManage = () => {
                       key={product._id}
                       id={`product-row-${product._id}`}
                       className={`border-b border-neutral-100 hover:bg-neutral-50 transition-colors ${
-                        product.inventoryCount === 0 ? 'bg-red-50/30' : ''
+                        totalStock(product.variants) === 0 ? 'bg-red-50/30' : ''
                       }`}
                     >
-                      {/* Product image */}
+                      {/* Image */}
                       <td className="p-4">
                         <img
                           src={product.images?.[0]?.url}
@@ -314,20 +493,18 @@ const ProductManage = () => {
                         />
                       </td>
 
-                      {/* Product Name/Category */}
+                      {/* Name / Category */}
                       <td className="p-4">
-                        <div>
-                          <p className="text-neutral-900 font-semibold text-sm line-clamp-1 max-w-[250px]">{product.title}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-neutral-800 font-semibold text-[10px] tracking-wider uppercase">{product.category}</span>
-                            {product.subcategory && (
-                              <span className="text-neutral-400 text-[10px] uppercase tracking-wider">· {product.subcategory}</span>
-                            )}
-                          </div>
-                          <p className="text-neutral-400 text-[10px] mt-0.5">
-                            {product.brand && `${product.brand} · `}{product.sizes?.join(', ')}
-                          </p>
+                        <p className="text-neutral-900 font-semibold text-sm line-clamp-1 max-w-[220px]">{product.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-neutral-800 font-semibold text-[10px] tracking-wider uppercase">{product.category}</span>
+                          {product.subcategory && (
+                            <span className="text-neutral-400 text-[10px] uppercase tracking-wider">· {product.subcategory}</span>
+                          )}
                         </div>
+                        {product.brand && (
+                          <p className="text-neutral-400 text-[10px] mt-0.5">{product.brand}</p>
+                        )}
                       </td>
 
                       {/* Price */}
@@ -338,12 +515,30 @@ const ProductManage = () => {
                         )}
                       </td>
 
-                      {/* Inventory — ADMIN sees raw number */}
+                      {/* Variants summary */}
                       <td className="p-4">
-                        <StockBadge count={product.inventoryCount} />
+                        <div className="flex flex-wrap gap-1 max-w-[120px]">
+                          {(product.variants || []).slice(0, 4).map((v) => (
+                            <span
+                              key={v.color}
+                              title={v.color}
+                              className="w-4 h-4 rounded-full border border-neutral-200 flex-shrink-0"
+                              style={{ backgroundColor: v.hex || '#999' }}
+                            />
+                          ))}
+                          {(product.variants || []).length > 4 && (
+                            <span className="text-[10px] text-neutral-400 self-center">+{product.variants.length - 4}</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-neutral-400 mt-1">{(product.variants || []).length} colour{(product.variants || []).length !== 1 ? 's' : ''}</p>
                       </td>
 
-                      {/* Published / Featured status */}
+                      {/* Stock */}
+                      <td className="p-4">
+                        <StockBadge variants={product.variants} />
+                      </td>
+
+                      {/* Published / Featured */}
                       <td className="p-4">
                         <div className="flex flex-col gap-1">
                           <span className={product.isPublished !== false ? 'badge-green text-[10px]' : 'badge-red text-[10px]'}>
@@ -358,7 +553,6 @@ const ProductManage = () => {
                       {/* Actions */}
                       <td className="p-4">
                         <div className="flex items-center gap-1 justify-end">
-                          {/* Restock button */}
                           <button
                             id={`restock-${product._id}`}
                             onClick={() => openRestock(product)}
@@ -367,8 +561,6 @@ const ProductManage = () => {
                           >
                             <Package size={15} />
                           </button>
-
-                          {/* Edit button */}
                           <button
                             id={`edit-product-${product._id}`}
                             onClick={() => openEdit(product)}
@@ -377,8 +569,6 @@ const ProductManage = () => {
                           >
                             <Pencil size={15} />
                           </button>
-
-                          {/* Delete button */}
                           <button
                             id={`delete-product-${product._id}`}
                             onClick={() => handleDelete(product._id)}
@@ -399,7 +589,7 @@ const ProductManage = () => {
         </div>
       )}
 
-      {/* ── CREATE / EDIT PRODUCT MODAL ──────────────────────────────────────── */}
+      {/* ── CREATE / EDIT PRODUCT MODAL ─────────────────────────────────────── */}
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -481,7 +671,7 @@ const ProductManage = () => {
                 value={form.category}
                 onChange={(e) => {
                   handleChange(e);
-                  setForm((p) => ({ ...p, subcategory: '' })); // reset subcategory
+                  setForm((p) => ({ ...p, subcategory: '' }));
                 }}
                 className="input text-neutral-900 bg-white"
               >
@@ -521,36 +711,6 @@ const ProductManage = () => {
               />
             </div>
 
-            {/* Inventory Count — admin only field */}
-            <div>
-              <label className="text-neutral-700 text-sm font-medium mb-1 flex items-center gap-2">
-                <Package size={14} className="text-brand-500" />
-                Inventory Count *
-                <span className="text-neutral-400 text-xs">(admin only)</span>
-              </label>
-              <input
-                id="product-inventory"
-                name="inventoryCount"
-                type="number"
-                min="0"
-                value={form.inventoryCount}
-                onChange={handleChange}
-                required
-                className="input"
-                placeholder="0"
-              />
-              {form.inventoryCount !== '' && (
-                <p className={`text-xs mt-1 font-medium ${
-                  Number(form.inventoryCount) === 0 ? 'text-red-600' :
-                  Number(form.inventoryCount) <= 5 ? 'text-yellow-600' : 'text-emerald-600'
-                }`}>
-                  {Number(form.inventoryCount) === 0 ? '⚠ Out of Stock — product will be greyed out'
-                   : Number(form.inventoryCount) <= 5 ? `⚡ Low Stock — customers will see "Low Stock" badge`
-                   : '✓ In Stock'}
-                </p>
-              )}
-            </div>
-
             {/* Tags */}
             <div className="md:col-span-2">
               <label className="text-neutral-700 text-sm font-medium mb-1 block">
@@ -570,11 +730,9 @@ const ProductManage = () => {
           {/* Product Images */}
           <div>
             <label className="text-neutral-700 text-sm font-medium mb-2 block">
-              Product Images * <span className="text-neutral-400 text-xs">(max 6, JPG/PNG/WebP, 5MB each)</span>
+              Product Images * <span className="text-neutral-400 text-xs">(max 6, JPG/PNG/WebP, 5 MB each)</span>
             </label>
-
             <div className="flex flex-wrap gap-3 items-center mb-3">
-              {/* Existing Images preview */}
               {editingProduct && existingImages.map((img) => (
                 <div key={img.publicId} className="h-20 w-20 border border-neutral-200 relative group rounded-lg overflow-hidden flex-shrink-0">
                   <img src={img.url} alt="" className="w-full h-full object-cover" />
@@ -587,8 +745,6 @@ const ProductManage = () => {
                   </button>
                 </div>
               ))}
-
-              {/* New Images preview */}
               {images.map((img, i) => (
                 <div key={i} className="h-20 w-20 border border-neutral-200 relative group rounded-lg overflow-hidden flex-shrink-0">
                   <img src={URL.createObjectURL(img)} alt="" className="w-full h-full object-cover" />
@@ -601,8 +757,6 @@ const ProductManage = () => {
                   </button>
                 </div>
               ))}
-
-              {/* Upload Dropzone */}
               {(existingImages.length + images.length) < 6 && (
                 <label
                   htmlFor="product-images-input"
@@ -613,7 +767,6 @@ const ProductManage = () => {
                 </label>
               )}
             </div>
-
             <input
               id="product-images-input"
               type="file"
@@ -628,28 +781,55 @@ const ProductManage = () => {
             />
           </div>
 
-          {/* Sizes */}
+          {/* ── Variant Builder ─────────────────────────────────────────────── */}
+          {/* ── Variant Builder ─────────────────────────────────────────────── */}
           <div>
-            <label className="text-neutral-700 text-sm font-medium mb-1 block">
-              Sizes * <span className="text-neutral-400 text-xs">({form.sizes.length} selected)</span>
-            </label>
-            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 mt-1">
-              {ALL_SIZES.map((size) => (
-                <label
-                  key={size}
-                  className="flex items-center justify-center border border-neutral-200 p-2 cursor-pointer text-neutral-800 has-[:checked]:bg-neutral-950 has-[:checked]:text-white transition-all"
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only"
-                    value={size}
-                    checked={form.sizes.includes(size)}
-                    onChange={() => toggleSize(size)}
-                  />
-                  <span className="text-xs font-semibold uppercase">{size}</span>
-                </label>
-              ))}
+            {/* Header row — always visible, anchored to the top */}
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-neutral-700 text-sm font-medium">
+                  Colour Variants *{' '}
+                  <span className="text-neutral-400 text-xs font-normal">
+                    ({form.variants.length} colour{form.variants.length !== 1 ? 's' : ''},{' '}
+                    {totalStock(form.variants)} total units)
+                  </span>
+                </p>
+                <p className="text-neutral-400 text-xs mt-0.5">Each colour has its own sizes and inventory counts.</p>
+              </div>
+              <button
+                type="button"
+                id="add-variant-btn"
+                onClick={handleAddVariant}
+                className="btn-secondary btn-sm rounded-lg flex items-center gap-1.5 text-xs flex-shrink-0"
+              >
+                <Plus size={13} /> Add Colour
+              </button>
             </div>
+
+            {/* Variant list — new cards prepend to the top */}
+            {form.variants.length === 0 ? (
+              <button
+                type="button"
+                onClick={handleAddVariant}
+                className="w-full border-2 border-dashed border-neutral-200 rounded-xl p-6 text-neutral-400 hover:border-neutral-400 hover:text-neutral-600 transition-colors text-sm flex flex-col items-center gap-2"
+              >
+                <Plus size={20} />
+                Click to add your first colour variant
+              </button>
+            ) : (
+              <div className="space-y-3">
+                {form.variants.map((variant, index) => (
+                  <VariantRow
+                    key={index}
+                    variant={variant}
+                    index={index}
+                    category={form.category}
+                    onChange={handleVariantChange}
+                    onRemove={handleVariantRemove}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Checkboxes */}
@@ -678,8 +858,6 @@ const ProductManage = () => {
             </label>
           </div>
 
-
-
           {/* Action Buttons */}
           <div className="flex gap-3 pt-2">
             <button
@@ -701,60 +879,80 @@ const ProductManage = () => {
         </form>
       </Modal>
 
-      {/* ── RESTOCK MODAL ─────────────────────────────────────────────────────── */}
+      {/* ── RESTOCK MODAL (per-variant inventory editor) ───────────────────── */}
       <Modal
         isOpen={restockModalOpen}
         onClose={() => setRestockModalOpen(false)}
         title="Update Inventory"
-        size="sm"
+        size="md"
       >
         {restockTarget && (
           <div className="space-y-5">
+            {/* Product header */}
             <div className="flex items-center gap-4 glass-sm rounded-xl p-4">
               <img
                 src={restockTarget.images?.[0]?.url}
                 alt={restockTarget.title}
-                className="w-14 h-16 object-cover rounded-lg bg-dark-700 flex-shrink-0"
+                className="w-14 h-16 object-cover rounded-lg bg-neutral-100 flex-shrink-0"
               />
               <div>
                 <p className="text-neutral-900 font-medium line-clamp-2 text-sm">{restockTarget.title}</p>
                 <div className="mt-1">
-                  <StockBadge count={restockTarget.inventoryCount} />
+                  <StockBadge variants={restockTarget.variants} />
                 </div>
               </div>
             </div>
 
-            <div>
-              <label className="label">New Inventory Count</label>
-              <input
-                id="restock-count-input"
-                type="number"
-                min="0"
-                value={restockCount}
-                onChange={(e) => setRestockCount(e.target.value)}
-                className="input text-lg font-semibold"
-                placeholder="0"
-                autoFocus
-              />
-              {restockCount !== '' && (
-                <p className={`text-xs mt-2 font-medium ${
-                  Number(restockCount) === 0 ? 'text-red-400' :
-                  Number(restockCount) <= 5 ? 'text-yellow-400' : 'text-emerald-400'
-                }`}>
-                  {Number(restockCount) === 0 ? '⚠ This will mark product as Out of Stock'
-                   : Number(restockCount) <= 5 ? `⚡ Customers will see "Low Stock" warning`
-                   : `✓ ${restockCount} units — In Stock`}
-                </p>
-              )}
-              <p className="text-neutral-500 text-xs mt-1">
-                Current: {restockTarget.inventoryCount} units → New: {restockCount || 0} units
-                {Number(restockCount) > restockTarget.inventoryCount && (
-                  <span className="text-emerald-400 ml-2">
-                    (+{Number(restockCount) - restockTarget.inventoryCount} added)
-                  </span>
-                )}
-              </p>
+            {/* Per-variant editor */}
+            <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+              {restockVariants.map((variant, vi) => (
+                <div key={vi} className="border border-neutral-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span
+                      className="w-4 h-4 rounded-full border border-neutral-200 flex-shrink-0"
+                      style={{ backgroundColor: variant.hex || '#999' }}
+                    />
+                    <p className="text-neutral-800 font-semibold text-sm">{variant.color}</p>
+                    <span className="text-[10px] text-neutral-400 ml-auto">
+                      {(variant.sizes || []).reduce((s, sz) => s + Number(sz.inventoryCount || 0), 0)} units total
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {(variant.sizes || []).map((sz, si) => (
+                      <div key={sz.size} className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider text-center">
+                          {sz.size}
+                        </label>
+                        <input
+                          id={`restock-${vi}-${sz.size}`}
+                          type="number"
+                          min="0"
+                          value={sz.inventoryCount}
+                          onChange={(e) => {
+                            const next = restockVariants.map((rv, rvi) => {
+                              if (rvi !== vi) return rv;
+                              return {
+                                ...rv,
+                                sizes: rv.sizes.map((s, ssi) =>
+                                  ssi === si ? { ...s, inventoryCount: Number(e.target.value) || 0 } : s
+                                ),
+                              };
+                            });
+                            setRestockVariants(next);
+                          }}
+                          className="input py-1.5 text-sm text-center"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
+
+            {/* Total */}
+            <p className="text-sm text-neutral-500 text-right font-medium">
+              New total: <span className="text-neutral-900 font-bold">{totalStock(restockVariants)} units</span>
+            </p>
 
             <div className="flex gap-3">
               <button
@@ -768,7 +966,7 @@ const ProductManage = () => {
                 onClick={handleRestock}
                 className="btn-primary btn-md flex-1 rounded-xl"
               >
-                <Package size={16} /> Update Stock
+                <Package size={16} /> Save Inventory
               </button>
             </div>
           </div>

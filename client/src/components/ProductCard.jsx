@@ -12,6 +12,14 @@ const ProductCard = ({ product }) => {
   const isAvailable = product.isAvailable !== false;
   const stockStatus = product.stockStatus || (isAvailable ? 'In Stock' : 'Out of Stock');
 
+  // Derive sizes and colours from variants
+  const variants = product.variants || [];
+  const allSizes = [...new Set(variants.flatMap((v) => (v.sizes || []).map((s) => s.size)))];
+  const firstVariant = variants[0] || null;
+  const firstAvailableSize = firstVariant
+    ? (firstVariant.sizes || []).find((s) => s.inventoryCount > 0)?.size || allSizes[0]
+    : '';
+
   const handleQuickAdd = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -19,11 +27,11 @@ const ProductCard = ({ product }) => {
 
     addItem({
       product: product._id,
-      title: product.title,
-      image: product.images[0]?.url,
-      price: product.price,
-      size: product.sizes[0],
-      color: product.colors[0]?.name || '',
+      title:   product.title,
+      image:   firstVariant?.image || product.images[0]?.url,
+      price:   product.price,
+      size:    firstAvailableSize || '',
+      color:   firstVariant?.color || '',
       quantity: 1,
     });
     toast.success(`${product.title} added!`, {
@@ -129,16 +137,16 @@ const ProductCard = ({ product }) => {
           )}
         </div>
 
-        {/* Size chips */}
-        {isAvailable && (
+        {/* Size chips — derived from variants */}
+        {isAvailable && allSizes.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {product.sizes.slice(0, 4).map((size) => (
+            {allSizes.slice(0, 4).map((size) => (
               <span key={size} className="text-[9px] uppercase text-brand-900/50 border border-line px-1.5 py-0.5 bg-nude-50">
                 {size}
               </span>
             ))}
-            {product.sizes.length > 4 && (
-              <span className="text-[9px] uppercase text-brand-900/40 px-1 pt-0.5">+{product.sizes.length - 4}</span>
+            {allSizes.length > 4 && (
+              <span className="text-[9px] uppercase text-brand-900/40 px-1 pt-0.5">+{allSizes.length - 4}</span>
             )}
           </div>
         )}
