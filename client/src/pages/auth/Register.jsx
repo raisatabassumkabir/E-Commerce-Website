@@ -34,10 +34,7 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="absolute -top-40 -right-40 w-[500px] h-[500px] rounded-full bg-brand-900/20 blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] rounded-full bg-indigo-900/15 blur-3xl pointer-events-none" />
-
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#FDFBF9] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-100 via-[#FDFBF9] to-[#FDFBF9] relative overflow-hidden">
       <div className="w-full max-w-md relative z-10 animate-slide-up">
         <div className="text-center mb-10">
           <Link to="/" className="inline-flex items-center gap-2 group mb-6">
@@ -46,7 +43,7 @@ const Register = () => {
             </div>
             <span className="font-display font-bold text-2xl gradient-text">ThreadHaus</span>
           </Link>
-          <h1 className="heading-display text-3xl text-neutral-900 mb-2">Create your account</h1>
+          <h1 className="text-3xl font-bold text-neutral-900 tracking-tight mb-2">Create your account</h1>
           <p className="text-neutral-500">Join thousands of style-conscious shoppers</p>
         </div>
 
@@ -59,17 +56,17 @@ const Register = () => {
           ))}
         </div>
 
-        <form id="register-form" onSubmit={handleSubmit} className="glass rounded-2xl p-8 space-y-5">
+        <form id="register-form" onSubmit={handleSubmit} className="bg-white/60 backdrop-blur-xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl p-8 sm:p-10 space-y-5">
           <div>
-            <label htmlFor="register-name" className="label">Full name</label>
-            <input id="register-name" type="text" name="name" value={form.name} onChange={handleChange} required placeholder="Jane Doe" className="input" />
+            <label htmlFor="register-name" className="block text-xs font-semibold text-neutral-700 tracking-wide uppercase mb-1.5">Full name</label>
+            <input id="register-name" type="text" name="name" value={form.name} onChange={handleChange} required placeholder="Jane Doe" className="w-full bg-white/50 border border-neutral-200 text-neutral-900 text-sm rounded-lg px-4 py-3 focus:outline-none focus:border-neutral-900 focus:ring-0 transition-colors duration-200" />
           </div>
           <div>
-            <label htmlFor="register-email" className="label">Email address</label>
-            <input id="register-email" type="email" name="email" value={form.email} onChange={handleChange} required autoComplete="email" placeholder="you@example.com" className="input" />
+            <label htmlFor="register-email" className="block text-xs font-semibold text-neutral-700 tracking-wide uppercase mb-1.5">Email address</label>
+            <input id="register-email" type="email" name="email" value={form.email} onChange={handleChange} required autoComplete="email" placeholder="you@example.com" className="w-full bg-white/50 border border-neutral-200 text-neutral-900 text-sm rounded-lg px-4 py-3 focus:outline-none focus:border-neutral-900 focus:ring-0 transition-colors duration-200" />
           </div>
           <div>
-            <label htmlFor="register-password" className="label">Password</label>
+            <label htmlFor="register-password" className="block text-xs font-semibold text-neutral-700 tracking-wide uppercase mb-1.5">Password</label>
             <div className="relative">
               <input
                 id="register-password"
@@ -81,7 +78,7 @@ const Register = () => {
                 minLength={8}
                 autoComplete="new-password"
                 placeholder="Min. 8 characters"
-                className="input pr-12"
+                className="w-full bg-white/50 border border-neutral-200 text-neutral-900 text-sm rounded-lg px-4 py-3 pr-12 focus:outline-none focus:border-neutral-900 focus:ring-0 transition-colors duration-200"
               />
               <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-900 transition-colors">
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -96,7 +93,7 @@ const Register = () => {
             )}
           </div>
 
-          <button id="register-submit-btn" type="submit" disabled={isLoading} className="btn-primary btn-lg w-full rounded-xl">
+          <button id="register-submit-btn" type="submit" disabled={isLoading} className="w-full bg-neutral-950 text-white rounded-lg py-3.5 text-sm font-medium hover:bg-neutral-800 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             {isLoading ? 'Creating account...' : (<>Create Account <ArrowRight size={18} /></>)}
           </button>
 
