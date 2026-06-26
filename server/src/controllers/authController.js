@@ -11,7 +11,7 @@ const register = asyncHandler(async (req, res, next) => {
     return next(new AppError(errors.array()[0].msg, 400));
   }
 
-  const { name, email, password } = req.body;
+  const { name, email, password, guestCart } = req.body;
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -19,6 +19,11 @@ const register = asyncHandler(async (req, res, next) => {
   }
 
   const user = await User.create({ name, email, password });
+
+  if (guestCart && Array.isArray(guestCart)) {
+    user.cart = mergeCarts([], guestCart);
+    await user.save();
+  }
 
   generateToken(res, user._id);
 
@@ -31,6 +36,7 @@ const register = asyncHandler(async (req, res, next) => {
       role: user.role,
       avatar: user.avatar,
     },
+    cart: user.cart,
   });
 });
 
@@ -41,7 +47,7 @@ const login = asyncHandler(async (req, res, next) => {
     return next(new AppError(errors.array()[0].msg, 400));
   }
 
-  const { email, password } = req.body;
+  const { email, password, guestCart } = req.body;
 
   // Explicitly select password field (excluded by default)
   const user = await User.findOne({ email }).select('+password');
@@ -51,6 +57,11 @@ const login = asyncHandler(async (req, res, next) => {
 
   if (!user.isActive) {
     return next(new AppError('Your account has been deactivated.', 401));
+  }
+
+  if (guestCart && Array.isArray(guestCart)) {
+    user.cart = mergeCarts(user.cart || [], guestCart);
+    await user.save();
   }
 
   generateToken(res, user._id);
@@ -64,6 +75,7 @@ const login = asyncHandler(async (req, res, next) => {
       role: user.role,
       avatar: user.avatar,
     },
+    cart: user.cart,
   });
 });
 
@@ -137,4 +149,45 @@ const addAddress = asyncHandler(async (req, res, next) => {
   res.status(201).json({ success: true, addresses: user.addresses });
 });
 
-module.exports = { register, login, logout, getMe, updateProfile, updatePassword, addAddress };
+// ── PUT /api/auth/cart ──────────────────────────────────────────────────────────
+const updateCart = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+  if (!user) return next(new AppError('User not found.', 404));
+
+  user.cart = req.body.cart || [];
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    cart: user.cart,
+  });
+});
+
+// ── Cart Merging Helper ─────────────────────────────────────────────────────────
+const mergeCarts = (existingCart, guestCart) => {
+  const merged = [...existingCart];
+  for (const guestItem of guestCart) {
+    const existingIndex = merged.findIndex(
+      (item) =>
+        item.product.toString() === guestItem.product.toString() &&
+        item.size === guestItem.size &&
+        item.color === guestItem.color
+    );
+    if (existingIndex > -1) {
+      merged[existingIndex].quantity += guestItem.quantity;
+    } else {
+      merged.push({
+        product: guestItem.product,
+        title: guestItem.title,
+        image: guestItem.image,
+        price: guestItem.price,
+        size: guestItem.size,
+        color: guestItem.color,
+        quantity: guestItem.quantity,
+      });
+    }
+  }
+  return merged;
+};
+
+module.exports = { register, login, logout, getMe, updateProfile, updatePassword, addAddress, updateCart };

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, Star, AlertCircle } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
@@ -34,6 +35,7 @@ const ProductCard = ({ product }) => {
       color:   firstVariant?.color || '',
       quantity: 1,
     });
+    useCartStore.getState().openCart();
     toast.success(`${product.title} added!`, {
       style: { background: '#1A1918', color: '#fff', borderRadius: '4px' },
       iconTheme: { primary: '#fff', secondary: '#1A1918' },
@@ -155,4 +157,4 @@ const ProductCard = ({ product }) => {
   );
 };
 
-export default ProductCard;
+export default memo(ProductCard);

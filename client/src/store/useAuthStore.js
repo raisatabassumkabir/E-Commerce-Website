@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '../services/api';
+import { useCartStore } from './useCartStore';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -10,8 +11,12 @@ export const useAuthStore = create((set, get) => ({
   login: async (credentials) => {
     set({ isLoading: true });
     try {
-      const { data } = await api.post('/auth/login', credentials);
+      const guestCart = useCartStore.getState().items;
+      const { data } = await api.post('/auth/login', { ...credentials, guestCart });
       set({ user: data.user, isLoading: false });
+      if (data.cart) {
+        useCartStore.setState({ items: data.cart });
+      }
       return { success: true };
     } catch (err) {
       set({ isLoading: false });
@@ -22,8 +27,12 @@ export const useAuthStore = create((set, get) => ({
   register: async (formData) => {
     set({ isLoading: true });
     try {
-      const { data } = await api.post('/auth/register', formData);
+      const guestCart = useCartStore.getState().items;
+      const { data } = await api.post('/auth/register', { ...formData, guestCart });
       set({ user: data.user, isLoading: false });
+      if (data.cart) {
+        useCartStore.setState({ items: data.cart });
+      }
       return { success: true };
     } catch (err) {
       set({ isLoading: false });
@@ -36,6 +45,7 @@ export const useAuthStore = create((set, get) => ({
       await api.post('/auth/logout');
     } finally {
       set({ user: null });
+      useCartStore.getState().clearCart();
     }
   },
 
@@ -44,6 +54,9 @@ export const useAuthStore = create((set, get) => ({
     try {
       const { data } = await api.get('/auth/me');
       set({ user: data.user, isLoading: false, isInitialized: true });
+      if (data.user && data.user.cart) {
+        useCartStore.setState({ items: data.user.cart });
+      }
     } catch {
       set({ user: null, isLoading: false, isInitialized: true });
     }

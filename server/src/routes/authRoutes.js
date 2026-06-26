@@ -8,6 +8,7 @@ const {
   updateProfile,
   updatePassword,
   addAddress,
+  updateCart,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const { uploadAvatar } = require('../middleware/uploadMiddleware');
@@ -36,5 +37,6 @@ router.get('/me', protect, getMe);
 router.put('/profile', protect, uploadAvatar.single('avatar'), updateProfile);
 router.put('/password', protect, updatePassword);
 router.post('/addresses', protect, addAddress);
+router.put('/cart', protect, updateCart);
 
 module.exports = router;

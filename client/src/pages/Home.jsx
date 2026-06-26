@@ -123,6 +123,7 @@ const Home = () => {
                   src={cat.img}
                   alt={cat.name}
                   className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700 grayscale-[15%]"
+                  loading="lazy"
                 />
               </div>
               <div className="flex items-center justify-between">

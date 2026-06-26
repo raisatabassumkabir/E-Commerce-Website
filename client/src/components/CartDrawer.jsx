@@ -1,14 +1,53 @@
+import { useState } from 'react';
 import { X, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/useAuthStore';
+import api from '../services/api';
+import toast from 'react-hot-toast';
+import Spinner from './Spinner';
 
 const CartDrawer = ({ isOpen, onClose }) => {
   const { items, removeItem, updateQuantity, totalItems, totalPrice, clearCart } = useCartStore();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  const handleCheckout = () => {
-    onClose();
-    navigate('/checkout');
+  const handleCheckout = async () => {
+    if (!user) {
+      onClose();
+      navigate('/login', { state: { from: '/cart' } });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const cartItems = items.map((item) => ({
+        product: item.product,
+        quantity: item.quantity,
+        size: item.size,
+        color: item.color,
+      }));
+
+      const { data } = await api.post('/payment/create-checkout-session', {
+        cartItems,
+        shippingAddress: user.addresses?.[0] || {
+          fullName: user.name,
+          street: '123 Fashion Ave',
+          city: 'New York',
+          state: 'NY',
+          postalCode: '10001',
+          country: 'US',
+        },
+      });
+
+      window.location.href = data.url;
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Checkout failed. Please try again.', {
+        style: { background: '#1a1a27', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' },
+      });
+      setLoading(false);
+    }
   };
 
   return (
@@ -120,8 +159,13 @@ const CartDrawer = ({ isOpen, onClose }) => {
               <span className="text-neutral-900 font-bold text-xl">${totalPrice().toFixed(2)}</span>
             </div>
             <p className="text-neutral-500 text-xs text-center font-normal tracking-wide mt-1">Shipping & taxes calculated at checkout</p>
-            <button id="cart-checkout-btn" onClick={handleCheckout} className="btn-primary btn-lg w-full rounded-xl">
-              Proceed to Checkout
+            <button
+              id="cart-checkout-btn"
+              onClick={handleCheckout}
+              disabled={loading}
+              className="btn-primary btn-lg w-full rounded-xl flex items-center justify-center gap-2"
+            >
+              {loading ? <Spinner size="sm" /> : 'Proceed to Checkout'}
             </button>
           </div>
         )}

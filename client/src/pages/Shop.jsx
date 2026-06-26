@@ -32,7 +32,10 @@ const Shop = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [keyword, setKeyword] = useState('');
+  // Debounced search term
+  const [keyword, setKeyword] = useState(searchParams.get('keyword') || '');
+  const [localKeyword, setLocalKeyword] = useState(searchParams.get('keyword') || '');
+  
   const [sort, setSort] = useState('newest');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -46,6 +49,23 @@ const Shop = () => {
     maxPrice: searchParams.get('maxPrice') || '',
     inStockOnly: searchParams.get('inStockOnly') || '',
   });
+
+  // Debounce logic for search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setKeyword(localKeyword);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [localKeyword]);
+
+  // Sync search keyword with URL param if it changes externally
+  useEffect(() => {
+    const urlKeyword = searchParams.get('keyword') || '';
+    if (urlKeyword !== localKeyword) {
+      setLocalKeyword(urlKeyword);
+      setKeyword(urlKeyword);
+    }
+  }, [searchParams]);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -87,6 +107,7 @@ const Shop = () => {
 
   const handleClearFilters = () => {
     setFilters(DEFAULT_FILTERS);
+    setLocalKeyword('');
     setKeyword('');
     setPage(1);
   };
@@ -133,7 +154,7 @@ const Shop = () => {
           })}
           {keyword && (
             <button
-              onClick={() => setKeyword('')}
+              onClick={() => { setLocalKeyword(''); setKeyword(''); }}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-nude-50 border border-line text-[10px] uppercase tracking-widest text-brand-900 hover:bg-line transition-all"
             >
               Search: "{keyword}" <X size={10} />
@@ -183,8 +204,8 @@ const Shop = () => {
               <input
                 id="shop-search-input"
                 type="search"
-                value={keyword}
-                onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+                value={localKeyword}
+                onChange={(e) => setLocalKeyword(e.target.value)}
                 placeholder="Search products..."
                 className="input pl-10 pr-4 text-sm"
               />

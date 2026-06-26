@@ -120,6 +120,7 @@ const ProductPage = () => {
       color:    selectedVariant?.color || '',
       quantity,
     });
+    useCartStore.getState().openCart();
     setTimeout(() => setAddingToCart(false), 1000);
     toast.success('Added to cart!', {
       style: { background: '#1a1a27', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' },

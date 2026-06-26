@@ -7,12 +7,14 @@ import { useCartStore } from '../store/useCartStore';
 import CartDrawer from '../components/CartDrawer';
 
 const UserLayout = () => {
-  const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { user, logout } = useAuthStore();
-  const totalItems = useCartStore((s) => s.totalItems);
+  const isCartOpen = useCartStore((s) => s.isCartOpen);
+  const openCart = useCartStore((s) => s.openCart);
+  const closeCart = useCartStore((s) => s.closeCart);
+  const totalItemsCount = useCartStore((s) => s.items.reduce((acc, item) => acc + item.quantity, 0));
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -81,13 +83,13 @@ const UserLayout = () => {
               {/* Cart */}
               <button
                 id="nav-cart"
-                onClick={() => setIsCartOpen(true)}
+                onClick={openCart}
                 className="relative text-brand-900/60 hover:text-brand-900 transition-colors"
               >
                 <ShoppingBag size={20} strokeWidth={1.5} />
-                {totalItems() > 0 && (
+                {totalItemsCount > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-brand-900 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                    {totalItems() > 9 ? '9+' : totalItems()}
+                    {totalItemsCount > 9 ? '9+' : totalItemsCount}
                   </span>
                 )}
               </button>
@@ -245,7 +247,7 @@ const UserLayout = () => {
       </footer>
 
       {/* Cart Drawer */}
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+      <CartDrawer isOpen={isCartOpen} onClose={closeCart} />
     </div>
   );
 };

@@ -43,6 +43,17 @@ const userSchema = new mongoose.Schema(
       default: '',
     },
     addresses: [addressSchema],
+    cart: [
+      {
+        product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+        title: { type: String, required: true },
+        image: { type: String },
+        price: { type: Number, required: true },
+        size: { type: String },
+        color: { type: String },
+        quantity: { type: Number, required: true, default: 1 },
+      }
+    ],
     isActive: {
       type: Boolean,
       default: true,

@@ -52,6 +52,36 @@ const Section = ({ id, title, badge, children, defaultOpen = true }) => {
 
 const FilterPanel = ({ filters, onChange, onClear, productCount }) => {
   const [subcategories, setSubcategories] = useState([]);
+  const [localMin, setLocalMin] = useState(filters.minPrice || '');
+  const [localMax, setLocalMax] = useState(filters.maxPrice || '');
+
+  // Sync local state when prop updates (e.g. preset click or clear)
+  useEffect(() => {
+    setLocalMin(filters.minPrice || '');
+  }, [filters.minPrice]);
+
+  useEffect(() => {
+    setLocalMax(filters.maxPrice || '');
+  }, [filters.maxPrice]);
+
+  // Debounced parent onChange triggers
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localMin !== (filters.minPrice || '')) {
+        onChange('minPrice', localMin);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [localMin, onChange, filters.minPrice]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localMax !== (filters.maxPrice || '')) {
+        onChange('maxPrice', localMax);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [localMax, onChange, filters.maxPrice]);
 
   useEffect(() => {
     if (!filters.category) {
@@ -259,8 +289,8 @@ const FilterPanel = ({ filters, onChange, onClear, productCount }) => {
               id="filter-price-min"
               type="number"
               min="0"
-              value={filters.minPrice || ''}
-              onChange={(e) => onChange('minPrice', e.target.value)}
+              value={localMin}
+              onChange={(e) => setLocalMin(e.target.value)}
               placeholder="0"
               className="w-full border border-neutral-200 bg-transparent py-1 px-2 text-sm text-neutral-900 rounded-none focus:outline-none focus:border-neutral-950 transition-colors"
             />
@@ -272,8 +302,8 @@ const FilterPanel = ({ filters, onChange, onClear, productCount }) => {
               id="filter-price-max"
               type="number"
               min="0"
-              value={filters.maxPrice || ''}
-              onChange={(e) => onChange('maxPrice', e.target.value)}
+              value={localMax}
+              onChange={(e) => setLocalMax(e.target.value)}
               placeholder="500"
               className="w-full border border-neutral-200 bg-transparent py-1 px-2 text-sm text-neutral-900 rounded-none focus:outline-none focus:border-neutral-950 transition-colors"
             />
