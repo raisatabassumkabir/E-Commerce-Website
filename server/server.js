@@ -17,9 +17,11 @@ connectDB();
 
 const app = express();
 
+const { stripeWebhook } = require('./src/controllers/paymentController');
+
 // ── Stripe webhook MUST use raw body ──────────────────────────────────────────
-// Mount payment routes BEFORE express.json() so the raw body is preserved
-app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
+// Mount webhook route BEFORE express.json() so the raw body is preserved
+app.post('/api/webhook/stripe', express.raw({ type: 'application/json' }), stripeWebhook);
 
 // ── Core middleware ────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));

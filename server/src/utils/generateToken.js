@@ -12,7 +12,7 @@ const generateToken = (res, userId) => {
 
   const isProduction = process.env.NODE_ENV === 'production';
 
-  res.cookie('jwt', token, {
+  res.cookie('token', token, {
     httpOnly: true,              // Not accessible via document.cookie
     secure: isProduction,        // HTTPS only in production
     sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-origin Vercel <-> Railway
@@ -29,7 +29,7 @@ const generateToken = (res, userId) => {
 const clearToken = (res) => {
   const isProduction = process.env.NODE_ENV === 'production';
 
-  res.cookie('jwt', '', {
+  res.cookie('token', '', {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'none' : 'lax',

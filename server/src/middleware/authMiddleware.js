@@ -8,7 +8,7 @@ const User = require('../models/User');
  * Attaches the authenticated user to req.user.
  */
 const protect = asyncHandler(async (req, res, next) => {
-  const token = req.cookies?.jwt;
+  const token = req.cookies?.token;
 
   if (!token) {
     return next(new AppError('Not authenticated. Please log in.', 401));

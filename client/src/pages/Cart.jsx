@@ -27,34 +27,12 @@ const Cart = () => {
   const tax = subtotal * 0.08;
   const total = subtotal + shipping + tax;
 
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     if (!user) {
       navigate('/login', { state: { from: '/cart' } });
       return;
     }
-
-    setLoading(true);
-    try {
-      const cartItems = items.map((item) => ({
-        product: item.product,
-        quantity: item.quantity,
-        size: item.size,
-        color: item.color,
-      }));
-
-      const { data } = await api.post('/payment/create-checkout-session', {
-        cartItems,
-        shippingAddress: user.addresses?.[0] || SAMPLE_ADDRESS,
-      });
-
-      // Redirect to Stripe Checkout
-      window.location.href = data.url;
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Checkout failed. Please try again.', {
-        style: { background: '#1a1a27', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' },
-      });
-      setLoading(false);
-    }
+    navigate('/checkout');
   };
 
   if (items.length === 0) {

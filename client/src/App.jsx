@@ -15,6 +15,7 @@ import Home from './pages/Home';
 import Shop from './pages/Shop';
 import ProductPage from './pages/ProductPage';
 import Cart from './pages/Cart';
+import Checkout from './pages/Checkout';
 import Orders from './pages/Orders';
 import PaymentSuccess from './pages/PaymentSuccess';
 import Login from './pages/auth/Login';
@@ -44,6 +45,7 @@ const App = () => {
           <Route path="/shop" element={<Shop />} />
           <Route path="/products/:id" element={<ProductPage />} />
           <Route path="/cart" element={<Cart />} />
+          <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
 
           {/* Protected user routes */}

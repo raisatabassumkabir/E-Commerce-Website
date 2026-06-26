@@ -35,9 +35,10 @@ const restoreInventory = async (productId, quantity, session) => {
 
 // ── POST /api/orders ───────────────────────────────────────────────────────────
 const createOrder = asyncHandler(async (req, res, next) => {
-  const { orderItems, shippingAddress } = req.body;
+  const { cartItems, orderItems, shippingAddress, paymentMethod, isPaid, stripePaymentIntentId } = req.body;
+  const items = cartItems || orderItems;
 
-  if (!orderItems || orderItems.length === 0) {
+  if (!items || items.length === 0) {
     return next(new AppError('No items in the order.', 400));
   }
 
@@ -48,7 +49,7 @@ const createOrder = asyncHandler(async (req, res, next) => {
   try {
     // Step 1: Verify products and prices server-side
     const verifiedItems = [];
-    for (const item of orderItems) {
+    for (const item of items) {
       const product = await Product.findById(item.product).session(session);
       if (!product || !product.isPublished) {
         throw new AppError(`Product not found: ${item.product}`, 404);
@@ -69,12 +70,10 @@ const createOrder = asyncHandler(async (req, res, next) => {
     }
 
     // Step 2: Atomically decrement inventory for each item
-    // If any product has insufficient stock, abort the entire transaction.
     const inventoryFailures = [];
     for (const item of verifiedItems) {
       const updated = await decrementInventory(item.product, item.quantity, session);
       if (!updated) {
-        // Fetch product name for a better error message
         const prod = await Product.findById(item.product).select('title inventoryCount').session(session);
         inventoryFailures.push(
           `"${prod?.title || item.product}" — requested ${item.quantity}, available: ${prod?.inventoryCount ?? 0}`
@@ -91,7 +90,7 @@ const createOrder = asyncHandler(async (req, res, next) => {
 
     // Step 3: Calculate pricing
     const itemsPrice = verifiedItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
-    const shippingPrice = itemsPrice > 100 ? 0 : 9.99;
+    const shippingPrice = req.body.shippingPrice !== undefined ? Number(req.body.shippingPrice) : (itemsPrice > 100 ? 0 : 9.99);
     const taxPrice = Number((0.08 * itemsPrice).toFixed(2));
     const totalPrice = Number((itemsPrice + shippingPrice + taxPrice).toFixed(2));
 
@@ -106,8 +105,10 @@ const createOrder = asyncHandler(async (req, res, next) => {
           shippingPrice,
           taxPrice,
           totalPrice,
-          paymentStatus: 'Pending',
+          paymentMethod: paymentMethod || 'Card',
+          paymentStatus: isPaid ? 'Paid' : 'Pending',
           deliveryStatus: 'Processing',
+          stripeSessionId: stripePaymentIntentId || null, // Storing PaymentIntent ID in the same field or schema update
         },
       ],
       { session }

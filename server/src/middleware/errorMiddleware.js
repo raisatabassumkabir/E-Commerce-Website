@@ -14,6 +14,7 @@ const notFound = (req, res, next) => {
 const errorHandler = (err, req, res, next) => {
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Internal Server Error';
+  console.error(`[ERROR HANDLER] ${statusCode} - ${message}`, err);
 
   // ── Mongoose: bad ObjectId ─────────────────────────────────────────────────
   if (err.name === 'CastError') {

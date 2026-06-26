@@ -1,4 +1,4 @@
-const stripe = require('../config/stripe');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
@@ -13,27 +13,89 @@ const decrementInventory = async (productId, quantity, session) =>
     { new: true, session }
   );
 
-const restoreInventory = async (productId, quantity, session) =>
-  Product.findByIdAndUpdate(
-    productId,
-    { $inc: { inventoryCount: +quantity } },
-    { new: true, session }
-  );
-
-// ── POST /api/payment/create-checkout-session ──────────────────────────────────
-const createCheckoutSession = asyncHandler(async (req, res, next) => {
-  const { cartItems, shippingAddress } = req.body;
-
-  if (!cartItems || cartItems.length === 0) {
-    return next(new AppError('Cart is empty.', 400));
+// ── POST /api/payment/create-payment-intent ──────────────────────────────────
+const createPaymentIntent = asyncHandler(async (req, res, next) => {
+  if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.includes('***')) {
+    return res.status(500).json({ message: "Stripe configuration error: Secret key is missing or invalid." });
   }
 
-  // ── Server-side product verification ────────────────────────────────────────
+  const { cartItems, shippingPrice } = req.body;
+
+  // Strict Payload Validation
+  if (!Array.isArray(cartItems) || cartItems.length === 0) {
+    return next(new AppError('Cart must be a non-empty array.', 400));
+  }
+
+  for (const item of cartItems) {
+    if (item.price === undefined || !item.quantity || (!item.name && !item.title)) {
+      return next(new AppError('Each cart item must have a price, quantity, and name/title.', 400));
+    }
+  }
+
   const verifiedItems = [];
   for (const item of cartItems) {
     const product = await Product.findById(item.product);
     if (!product || !product.isPublished) {
-      return next(new AppError(`Product not found: ${item.product}`, 404));
+      return next(new AppError(`Product not found: ${item.title || item.name}`, 404));
+    }
+    if (product.inventoryCount < item.quantity) {
+      return next(new AppError(`"${product.title}" only has ${product.inventoryCount} unit(s) left.`, 400));
+    }
+    verifiedItems.push({
+      price: product.price,
+      quantity: item.quantity,
+    });
+  }
+
+  const itemsPrice = verifiedItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
+  const finalShippingPrice = shippingPrice !== undefined ? Number(shippingPrice) : (itemsPrice > 100 ? 0 : 9.99);
+  const tax = Number((itemsPrice * 0.08).toFixed(2));
+  
+  // Total in cents
+  const totalAmount = Math.round((itemsPrice + finalShippingPrice + tax) * 100);
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: totalAmount,
+    currency: 'usd',
+    automatic_payment_methods: { enabled: true },
+    metadata: {
+      user: req.user._id.toString(),
+      cartItemsSummary: cartItems.map(i => `${i.quantity}x ${i.title || i.name}`).join(', ').substring(0, 500),
+    },
+  });
+
+  res.status(200).json({
+    clientSecret: paymentIntent.client_secret,
+  });
+});
+
+// ── POST /api/payment/create-checkout-session ──────────────────────────────────
+const createCheckoutSession = asyncHandler(async (req, res, next) => {
+  if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.includes('***')) {
+    return res.status(500).json({ message: "Stripe configuration error: Secret key is missing or invalid." });
+  }
+
+  const { cartItems, shippingAddress } = req.body;
+
+  // Strict Payload Validation
+  if (!Array.isArray(cartItems) || cartItems.length === 0) {
+    return next(new AppError('Cart must be a non-empty array.', 400));
+  }
+
+  for (const item of cartItems) {
+    if (item.price === undefined || !item.quantity || (!item.name && !item.title)) {
+      return next(new AppError('Each cart item must have a price, quantity, and name/title.', 400));
+    }
+  }
+
+  // ── Server-side product verification ────────────────────────────────────────
+  const verifiedItems = [];
+  const compactCartItems = [];
+
+  for (const item of cartItems) {
+    const product = await Product.findById(item.product);
+    if (!product || !product.isPublished) {
+      return next(new AppError(`Product not found: ${item.title || item.name}`, 404));
     }
     if (product.inventoryCount < item.quantity) {
       return next(
@@ -52,39 +114,35 @@ const createCheckoutSession = asyncHandler(async (req, res, next) => {
       size: item.size,
       color: item.color || '',
     });
+
+    compactCartItems.push({
+      p: product._id.toString(),
+      q: item.quantity,
+      s: item.size,
+      c: item.color || ''
+    });
   }
 
-  // ── Calculate totals ─────────────────────────────────────────────────────────
   const itemsPrice = verifiedItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
   const shippingPrice = itemsPrice > 100 ? 0 : 9.99;
-  const taxPrice = Number((0.08 * itemsPrice).toFixed(2));
-  const totalPrice = Number((itemsPrice + shippingPrice + taxPrice).toFixed(2));
-
-  // ── Create a PENDING order (inventory decremented only on webhook confirmation) ─
-  const order = await Order.create({
-    user: req.user._id,
-    orderItems: verifiedItems,
-    shippingAddress,
-    itemsPrice,
-    shippingPrice,
-    taxPrice,
-    totalPrice,
-    paymentStatus: 'Pending',
-    deliveryStatus: 'Processing',
-  });
 
   // ── Build Stripe line items ─────────────────────────────────────────────────
-  const lineItems = verifiedItems.map((item) => ({
-    price_data: {
-      currency: 'usd',
-      product_data: {
-        name: `${item.title} (Size: ${item.size})`,
-        images: [item.image].filter(Boolean),
+  const lineItems = verifiedItems.map((item) => {
+    // Stripe requires valid HTTP/HTTPS URLs. It often rejects localhost or relative paths.
+    const isValidStripeImage = item.image && item.image.startsWith('http') && !item.image.includes('localhost');
+    
+    return {
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: `${item.title} (Size: ${item.size})`,
+          images: isValidStripeImage ? [item.image] : [],
+        },
+        unit_amount: Math.round(item.price * 100),
       },
-      unit_amount: Math.round(item.price * 100),
-    },
-    quantity: item.quantity,
-  }));
+      quantity: item.quantity,
+    };
+  });
 
   if (shippingPrice > 0) {
     lineItems.push({
@@ -105,20 +163,17 @@ const createCheckoutSession = asyncHandler(async (req, res, next) => {
     success_url: `${process.env.CLIENT_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.CLIENT_URL}/cart`,
     metadata: {
-      orderId: order._id.toString(),
       userId: req.user._id.toString(),
+      cartItems: JSON.stringify(compactCartItems).substring(0, 500),
+      shippingAddress: JSON.stringify(shippingAddress).substring(0, 500)
     },
     customer_email: req.user.email,
   });
 
-  order.stripeSessionId = session.id;
-  await order.save();
-
-  res.status(200).json({ success: true, url: session.url });
+  res.status(200).json({ success: true, id: session.id, url: session.url });
 });
 
-// ── POST /api/payment/webhook ──────────────────────────────────────────────────
-// Raw body MUST be used here — configured in server.js BEFORE express.json()
+// ── POST /api/webhook/stripe ──────────────────────────────────────────────────
 const stripeWebhook = async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
@@ -134,56 +189,83 @@ const stripeWebhook = async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // ── Payment succeeded: decrement inventory atomically ───────────────────────
   if (event.type === 'checkout.session.completed') {
     const stripeSession = event.data.object;
-    const order = await Order.findOne({ stripeSessionId: stripeSession.id });
+    const metadata = stripeSession.metadata;
+    const userId = metadata.userId;
+    const compactCartItems = JSON.parse(metadata.cartItems || '[]');
+    const shippingAddress = JSON.parse(metadata.shippingAddress || '{}');
 
-    if (order && order.paymentStatus !== 'Paid') {
-      const mongoSession = await mongoose.startSession();
-      mongoSession.startTransaction();
+    // Make sure we don't duplicate processing
+    const existingOrder = await Order.findOne({ stripeSessionId: stripeSession.id });
+    if (existingOrder) {
+      return res.status(200).json({ received: true });
+    }
 
-      try {
-        const inventoryFailures = [];
+    const mongoSession = await mongoose.startSession();
+    mongoSession.startTransaction();
 
-        for (const item of order.orderItems) {
-          const updated = await decrementInventory(item.product, item.quantity, mongoSession);
+    try {
+      // Reconstruct order details
+      const orderItems = [];
+      let itemsPrice = 0;
+      const inventoryFailures = [];
+
+      for (const item of compactCartItems) {
+        const product = await Product.findById(item.p).session(mongoSession);
+        if (product) {
+          orderItems.push({
+            product: product._id,
+            title: product.title,
+            image: product.images[0]?.url || '',
+            price: product.price,
+            quantity: item.q,
+            size: item.s,
+            color: item.c
+          });
+          itemsPrice += product.price * item.q;
+
+          const updated = await decrementInventory(item.p, item.q, mongoSession);
           if (!updated) {
-            inventoryFailures.push({ product: item.product, quantity: item.quantity });
+            inventoryFailures.push({ product: item.p, quantity: item.q });
           }
         }
-
-        if (inventoryFailures.length > 0) {
-          // Extremely rare: item sold out between session creation and webhook
-          // Mark as paid but flag for manual review
-          console.warn(`⚠️  Oversell detected for order ${order._id}. Manual review needed.`);
-          order.deliveryStatus = 'Processing'; // Admin will resolve manually
-        }
-
-        order.paymentStatus = 'Paid';
-        order.paidAt = new Date();
-        await order.save({ session: mongoSession });
-
-        await mongoSession.commitTransaction();
-        mongoSession.endSession();
-
-        console.log(`✅  Order ${order._id} confirmed via Stripe webhook.`);
-      } catch (err) {
-        await mongoSession.abortTransaction();
-        mongoSession.endSession();
-        console.error(`❌  Webhook inventory update failed for order ${order._id}:`, err);
       }
-    }
-  }
 
-  // ── Session expired (user abandoned checkout): restore order to Failed ───────
-  if (event.type === 'checkout.session.expired') {
-    const stripeSession = event.data.object;
-    const order = await Order.findOne({ stripeSessionId: stripeSession.id });
-    if (order && order.paymentStatus === 'Pending') {
-      order.paymentStatus = 'Failed';
-      await order.save();
-      console.log(`⚠️  Order ${order._id} expired — marked Failed.`);
+      const shippingPrice = itemsPrice > 100 ? 0 : 9.99;
+      const taxPrice = Number((0.08 * itemsPrice).toFixed(2));
+      const totalPrice = Number((itemsPrice + shippingPrice + taxPrice).toFixed(2));
+
+      let deliveryStatus = 'Processing';
+      if (inventoryFailures.length > 0) {
+        console.warn(`⚠️ Oversell detected for webhook session ${stripeSession.id}.`);
+      }
+
+      const order = new Order({
+        user: userId,
+        orderItems,
+        shippingAddress,
+        itemsPrice,
+        shippingPrice,
+        taxPrice,
+        totalPrice,
+        paymentStatus: 'Paid',
+        deliveryStatus,
+        stripeSessionId: stripeSession.id,
+        paidAt: new Date()
+      });
+
+      await order.save({ session: mongoSession });
+      await mongoSession.commitTransaction();
+      mongoSession.endSession();
+
+      console.log(`✅  Order ${order._id} created via Stripe webhook.`);
+    } catch (err) {
+      await mongoSession.abortTransaction();
+      mongoSession.endSession();
+      console.error(`❌  Webhook order creation failed:`, err);
+      // Stripe will retry if we send a 500
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
 
@@ -201,4 +283,9 @@ const verifyPayment = asyncHandler(async (req, res, next) => {
   res.status(200).json({ success: true, order });
 });
 
-module.exports = { createCheckoutSession, stripeWebhook, verifyPayment };
+module.exports = {
+  createCheckoutSession,
+  createPaymentIntent,
+  stripeWebhook,
+  verifyPayment,
+};
