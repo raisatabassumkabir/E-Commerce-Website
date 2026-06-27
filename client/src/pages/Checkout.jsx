@@ -43,7 +43,11 @@ const CheckoutForm = ({ formData, shippingMethod, setShippingMethod, shippingCos
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
-    if (!stripe || !elements) return; // Silent abort to prevent IntegrationError
+    // GUARD CLAUSE: Prevent crash if Stripe isn't ready
+    if (!stripe || !elements) {
+      console.warn("Stripe is not ready yet.");
+      return; 
+    }
 
     if (!formData.fullName || !formData.address || !formData.phone || !formData.city || !formData.state || !formData.zip) {
       return toast.error('Please fill in all shipping details');
@@ -161,14 +165,7 @@ const CheckoutForm = ({ formData, shippingMethod, setShippingMethod, shippingCos
 
           {paymentMethod === 'card' && (
             <div className="mt-4 pt-3 border-t border-neutral-100">
-              <PaymentElement
-                options={{
-                  layout: 'tabs',
-                  // Suppress the Stripe Link badge and wallet buttons
-                  wallets: { applePay: 'never', googlePay: 'never' },
-                  terms: { card: 'never' },
-                }}
-              />
+              <PaymentElement options={{ layout: 'tabs' }} />
             </div>
           )}
         </div>
@@ -421,14 +418,10 @@ const Checkout = () => {
               <div className="space-y-4 pt-1">
                 {items.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-4 px-1">
-                    {/* Shared relative wrapper — badge and image container are SIBLINGS */}
-                    <div className="relative h-16 w-16 shrink-0">
-                      {/* Image container clips itself cleanly with overflow-hidden */}
-                      <div className="h-full w-full rounded-md border border-neutral-200 bg-white overflow-hidden">
-                        <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
-                      </div>
-                      {/* Badge is OUTSIDE the overflow-hidden div — can never be clipped */}
-                      <span className="absolute -top-1 -right-1 z-50 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-700 text-[10px] font-bold text-white shadow-md ring-2 ring-white">
+                    <div className="relative h-16 w-16 shrink-0 z-10">
+                      <img src={item.image} alt={item.name} className="h-full w-full object-cover rounded-md border border-neutral-200" />
+                      {/* Badge absolutely positioned outside the image wrapper */}
+                      <span className="absolute -top-2 -right-2 z-50 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-700 text-[10px] font-bold text-white shadow-sm">
                         {item.quantity}
                       </span>
                     </div>
