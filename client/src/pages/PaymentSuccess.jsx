@@ -11,22 +11,30 @@ const PaymentSuccess = () => {
   const [loading, setLoading] = useState(true);
   const clearCart = useCartStore((s) => s.clearCart);
   const sessionId = searchParams.get('session_id');
+  const paymentIntent = searchParams.get('payment_intent');
+  const redirectStatus = searchParams.get('redirect_status');
 
   useEffect(() => {
     const verifyAndClear = async () => {
-      if (!sessionId) { setLoading(false); return; }
-      try {
-        const { data } = await api.get(`/payment/verify/${sessionId}`);
-        setOrder(data.order);
-        clearCart(); // Clear cart only after confirmed payment
-      } catch {
-        // Order may still be processing
-      } finally {
+      if (sessionId) {
+        try {
+          const { data } = await api.get(`/payment/verify/${sessionId}`);
+          setOrder(data.order);
+          clearCart(); // Clear cart only after confirmed payment
+        } catch {
+          // Order may still be processing
+        } finally {
+          setLoading(false);
+        }
+      } else if (paymentIntent && redirectStatus === 'succeeded') {
+        clearCart();
+        setLoading(false);
+      } else {
         setLoading(false);
       }
     };
     verifyAndClear();
-  }, [sessionId, clearCart]);
+  }, [sessionId, paymentIntent, redirectStatus, clearCart]);
 
   if (loading) {
     return (

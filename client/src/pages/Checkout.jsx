@@ -79,38 +79,38 @@ const CheckoutForm = ({ formData, shippingMethod, setShippingMethod, shippingCos
       };
 
       if (paymentMethod === 'card') {
-        const { error, paymentIntent } = await stripe.confirmPayment({
+        const { error } = await stripe.confirmPayment({
           elements,
           confirmParams: {
             return_url: `${window.location.origin}/payment-success`,
-            payment_method_data: {
-              billing_details: {
-                name:  formData.fullName,
-                phone: formData.phone,
-                address: {
-                  city:        formData.city,
-                  state:       formData.state,
-                  postal_code: formData.zip,
-                  line1:       formData.address,
-                },
+            shipping: {
+              name: formData.fullName,
+              phone: formData.phone,
+              address: {
+                line1: formData.address,
+                city: formData.city,
+                state: formData.state,
+                postal_code: formData.zip,
+                country: 'US',
+              }
+            },
+            billing_details: {
+              name:  formData.fullName,
+              phone: formData.phone,
+              address: {
+                city:        formData.city,
+                state:       formData.state,
+                postal_code: formData.zip,
+                line1:       formData.address,
               },
             },
           },
-          redirect: 'if_required',
         });
 
         if (error) {
           toast.error(error.message);
           setLoading(false);
           return;
-        }
-
-        if (paymentIntent?.status === 'succeeded') {
-          orderData.isPaid = true;
-          orderData.stripePaymentIntentId = paymentIntent.id;
-          await api.post('/orders/create', orderData);
-          clearCart();
-          navigate('/payment-success');
         }
       } else if (paymentMethod === 'paypal') {
         toast.success('Redirecting to PayPal...');

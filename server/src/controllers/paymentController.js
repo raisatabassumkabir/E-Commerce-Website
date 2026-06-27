@@ -13,6 +13,75 @@ const decrementInventory = async (productId, quantity, session) =>
     { new: true, session }
   );
 
+// Helper to construct and save the order in MongoDB using a Mongoose Transaction
+const processOrderCreation = async ({ userId, compactCartItems, shippingAddress, stripeSessionId, stripePaymentIntentId }) => {
+  const mongoSession = await mongoose.startSession();
+  mongoSession.startTransaction();
+
+  try {
+    const orderItems = [];
+    let itemsPrice = 0;
+    const inventoryFailures = [];
+
+    for (const item of compactCartItems) {
+      const product = await Product.findById(item.p).session(mongoSession);
+      if (product) {
+        orderItems.push({
+          product: product._id,
+          title: product.title,
+          image: product.images[0]?.url || '',
+          price: product.price,
+          quantity: item.q,
+          size: item.s,
+          color: item.c || '',
+        });
+        itemsPrice += product.price * item.q;
+
+        const updated = await decrementInventory(item.p, item.q, mongoSession);
+        if (!updated) {
+          inventoryFailures.push({ product: item.p, quantity: item.q });
+        }
+      }
+    }
+
+    const shippingPrice = itemsPrice > 100 ? 0 : 9.99;
+    const taxPrice = Number((0.08 * itemsPrice).toFixed(2));
+    const totalPrice = Number((itemsPrice + shippingPrice + taxPrice).toFixed(2));
+
+    let deliveryStatus = 'Processing';
+    if (inventoryFailures.length > 0) {
+      console.warn(`⚠️ Oversell detected for Stripe transaction.`);
+    }
+
+    const order = new Order({
+      user: userId,
+      orderItems,
+      shippingAddress,
+      itemsPrice,
+      shippingPrice,
+      taxPrice,
+      totalPrice,
+      paymentMethod: stripePaymentIntentId ? 'Card' : 'Stripe',
+      paymentStatus: 'Paid',
+      deliveryStatus,
+      stripeSessionId: stripeSessionId || stripePaymentIntentId,
+      paidAt: new Date()
+    });
+
+    await order.save({ session: mongoSession });
+    await mongoSession.commitTransaction();
+    mongoSession.endSession();
+
+    console.log(`✅  Order ${order._id} created via Stripe webhook.`);
+    return order;
+  } catch (err) {
+    await mongoSession.abortTransaction();
+    mongoSession.endSession();
+    console.error(`❌  Webhook order creation failed:`, err);
+    throw err;
+  }
+};
+
 // ── POST /api/payment/create-payment-intent ──────────────────────────────────
 const createPaymentIntent = asyncHandler(async (req, res, next) => {
   if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.includes('***')) {
@@ -33,6 +102,7 @@ const createPaymentIntent = asyncHandler(async (req, res, next) => {
   }
 
   const verifiedItems = [];
+  const compactCartItems = [];
   for (const item of cartItems) {
     const product = await Product.findById(item.product);
     if (!product || !product.isPublished) {
@@ -44,6 +114,13 @@ const createPaymentIntent = asyncHandler(async (req, res, next) => {
     verifiedItems.push({
       price: product.price,
       quantity: item.quantity,
+    });
+    
+    compactCartItems.push({
+      p: product._id.toString(),
+      q: item.quantity,
+      s: item.size || '',
+      c: item.color || ''
     });
   }
 
@@ -59,8 +136,8 @@ const createPaymentIntent = asyncHandler(async (req, res, next) => {
     currency: 'usd',
     automatic_payment_methods: { enabled: true },
     metadata: {
-      user: req.user._id.toString(),
-      cartItemsSummary: cartItems.map(i => `${i.quantity}x ${i.title || i.name}`).join(', ').substring(0, 500),
+      userId: req.user._id.toString(),
+      cartItems: JSON.stringify(compactCartItems).substring(0, 500),
     },
   });
 
@@ -189,87 +266,65 @@ const stripeWebhook = async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  if (event.type === 'checkout.session.completed') {
-    const stripeSession = event.data.object;
-    const metadata = stripeSession.metadata;
-    const userId = metadata.userId;
-    const compactCartItems = JSON.parse(metadata.cartItems || '[]');
-    const shippingAddress = JSON.parse(metadata.shippingAddress || '{}');
+  try {
+    if (event.type === 'checkout.session.completed') {
+      const stripeSession = event.data.object;
+      const metadata = stripeSession.metadata;
+      const userId = metadata.userId;
+      const compactCartItems = JSON.parse(metadata.cartItems || '[]');
+      const shippingAddress = JSON.parse(metadata.shippingAddress || '{}');
 
-    // Make sure we don't duplicate processing
-    const existingOrder = await Order.findOne({ stripeSessionId: stripeSession.id });
-    if (existingOrder) {
-      return res.status(200).json({ received: true });
-    }
-
-    const mongoSession = await mongoose.startSession();
-    mongoSession.startTransaction();
-
-    try {
-      // Reconstruct order details
-      const orderItems = [];
-      let itemsPrice = 0;
-      const inventoryFailures = [];
-
-      for (const item of compactCartItems) {
-        const product = await Product.findById(item.p).session(mongoSession);
-        if (product) {
-          orderItems.push({
-            product: product._id,
-            title: product.title,
-            image: product.images[0]?.url || '',
-            price: product.price,
-            quantity: item.q,
-            size: item.s,
-            color: item.c
-          });
-          itemsPrice += product.price * item.q;
-
-          const updated = await decrementInventory(item.p, item.q, mongoSession);
-          if (!updated) {
-            inventoryFailures.push({ product: item.p, quantity: item.q });
-          }
-        }
+      // Make sure we don't duplicate processing
+      const existingOrder = await Order.findOne({ stripeSessionId: stripeSession.id });
+      if (existingOrder) {
+        return res.status(200).json({ received: true });
       }
 
-      const shippingPrice = itemsPrice > 100 ? 0 : 9.99;
-      const taxPrice = Number((0.08 * itemsPrice).toFixed(2));
-      const totalPrice = Number((itemsPrice + shippingPrice + taxPrice).toFixed(2));
-
-      let deliveryStatus = 'Processing';
-      if (inventoryFailures.length > 0) {
-        console.warn(`⚠️ Oversell detected for webhook session ${stripeSession.id}.`);
-      }
-
-      const order = new Order({
-        user: userId,
-        orderItems,
+      await processOrderCreation({
+        userId,
+        compactCartItems,
         shippingAddress,
-        itemsPrice,
-        shippingPrice,
-        taxPrice,
-        totalPrice,
-        paymentStatus: 'Paid',
-        deliveryStatus,
-        stripeSessionId: stripeSession.id,
-        paidAt: new Date()
+        stripeSessionId: stripeSession.id
       });
-
-      await order.save({ session: mongoSession });
-      await mongoSession.commitTransaction();
-      mongoSession.endSession();
-
-      console.log(`✅  Order ${order._id} created via Stripe webhook.`);
-    } catch (err) {
-      await mongoSession.abortTransaction();
-      mongoSession.endSession();
-      console.error(`❌  Webhook order creation failed:`, err);
-      // Stripe will retry if we send a 500
-      return res.status(500).json({ error: 'Internal Server Error' });
     }
-  }
 
-  res.status(200).json({ received: true });
+    if (event.type === 'payment_intent.succeeded') {
+      const paymentIntent = event.data.object;
+      
+      // Handle custom PaymentIntent metadata
+      if (paymentIntent.metadata && paymentIntent.metadata.cartItems) {
+        const { userId, cartItems } = paymentIntent.metadata;
+        const compactCartItems = JSON.parse(cartItems || '[]');
+
+        const existingOrder = await Order.findOne({ stripeSessionId: paymentIntent.id });
+        if (existingOrder) {
+          return res.status(200).json({ received: true });
+        }
+
+        const shipping = paymentIntent.shipping || {};
+        const shippingAddress = {
+          fullName: shipping.name || 'Anonymous',
+          street: shipping.address?.line1 || '',
+          city: shipping.address?.city || '',
+          state: shipping.address?.state || '',
+          postalCode: shipping.address?.postal_code || '',
+          country: shipping.address?.country || 'US',
+        };
+
+        await processOrderCreation({
+          userId,
+          compactCartItems,
+          shippingAddress,
+          stripePaymentIntentId: paymentIntent.id
+        });
+      }
+    }
+
+    res.status(200).json({ received: true });
+  } catch (err) {
+    // Stripe will retry if we send a 500
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 };
 
 // ── GET /api/payment/verify/:sessionId ────────────────────────────────────────
