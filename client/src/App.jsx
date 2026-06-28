@@ -47,6 +47,7 @@ const App = () => {
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
+          <Route path="/order-complete" element={<PaymentSuccess />} />
 
           {/* Protected user routes */}
           <Route

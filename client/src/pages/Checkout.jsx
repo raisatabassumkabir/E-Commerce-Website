@@ -12,6 +12,7 @@ import {
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
+import TestHelper from '../components/TestHelper';
 
 // ─── Stripe Init (safe guard) ────────────────────────────────────────────────
 const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
@@ -28,32 +29,72 @@ if (!stripePublicKey) {
 
 const stripePromise = stripePublicKey ? loadStripe(stripePublicKey) : null;
 
-// ─── Inner form — lives inside <Elements> so hooks work ──────────────────────
-const CheckoutForm = ({ formData, shippingMethod, setShippingMethod, shippingCost, subtotal }) => {
+// ─── Helper Components ────────────────────────────────────────────────────────
+const PriceSummary = ({ subtotal, shippingCost, tax, finalTotal }) => (
+  <div className="space-y-2 text-sm text-neutral-600">
+    <div className="flex justify-between"><span>Subtotal</span><span className="font-medium text-neutral-900">${subtotal.toFixed(2)}</span></div>
+    <div className="flex justify-between"><span>Shipping</span><span className="font-medium text-neutral-900">${shippingCost.toFixed(2)}</span></div>
+    <div className="flex justify-between"><span>Tax (8%)</span><span className="font-medium text-neutral-900">${tax.toFixed(2)}</span></div>
+    <div className="flex justify-between text-base font-bold text-neutral-900 pt-3 border-t border-neutral-200">
+      <span>Total</span><span>${finalTotal.toFixed(2)}</span>
+    </div>
+  </div>
+);
+
+const PlaceOrderButton = ({ isProcessing, stripe, elements, paymentMethod, finalTotal, onClick, hidden, id }) => {
+  const isCardNotReady = paymentMethod === 'card' && (!stripe || !elements);
+  return (
+    <button
+      id={id}
+      onClick={onClick}
+      disabled={isCardNotReady || isProcessing}
+      className={`w-full btn-primary btn-lg rounded-xl ${hidden ? 'sr-only' : ''}`}
+    >
+      {isProcessing ? 'Processing...' : `Place Order • $${finalTotal.toFixed(2)}`}
+    </button>
+  );
+};
+
+// ─── Child Component (Stripe isolated form) ──────────────────────────────────
+const EmbeddedPaymentForm = ({
+  formData,
+  shippingMethod,
+  setShippingMethod,
+  shippingCost,
+  subtotal,
+  paymentMethod,
+  setPaymentMethod,
+  onProcessingChange,
+}) => {
   const stripe    = useStripe();
   const elements  = useElements();
   const { items, clearCart } = useCartStore();
   const navigate  = useNavigate();
 
-  const [paymentMethod, setPaymentMethod] = useState('card');
-  const [loading, setLoading]             = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Sync processing state upward so parent can lock its buttons
+  useEffect(() => {
+    if (onProcessingChange) {
+      onProcessingChange(isProcessing);
+    }
+  }, [isProcessing, onProcessingChange]);
 
   const tax        = Number((subtotal * 0.08).toFixed(2));
   const finalTotal = subtotal + shippingCost + tax;
 
   const handlePlaceOrder = async (e) => {
-    e.preventDefault();
-    // GUARD CLAUSE: Prevent crash if Stripe isn't ready
-    if (!stripe || !elements) {
-      console.warn("Stripe is not ready yet.");
-      return; 
+    if (e) e.preventDefault();
+
+    if (!stripe || !elements || isProcessing) {
+      return;
     }
 
     if (!formData.fullName || !formData.address || !formData.phone || !formData.city || !formData.state || !formData.zip) {
       return toast.error('Please fill in all shipping details');
     }
 
-    setLoading(true);
+    setIsProcessing(true);
 
     try {
       const orderData = {
@@ -82,7 +123,7 @@ const CheckoutForm = ({ formData, shippingMethod, setShippingMethod, shippingCos
         const { error } = await stripe.confirmPayment({
           elements,
           confirmParams: {
-            return_url: `${window.location.origin}/payment-success`,
+            return_url: `${window.location.origin}/order-complete`,
             shipping: {
               name: formData.fullName,
               phone: formData.phone,
@@ -94,37 +135,40 @@ const CheckoutForm = ({ formData, shippingMethod, setShippingMethod, shippingCos
                 country: 'US',
               }
             },
-            billing_details: {
-              name:  formData.fullName,
-              phone: formData.phone,
-              address: {
-                city:        formData.city,
-                state:       formData.state,
-                postal_code: formData.zip,
-                line1:       formData.address,
+            payment_method_data: {
+              billing_details: {
+                name:  formData.fullName,
+                phone: formData.phone,
+                address: {
+                  city:        formData.city,
+                  state:       formData.state,
+                  postal_code: formData.zip,
+                  line1:       formData.address,
+                },
               },
             },
           },
         });
 
         if (error) {
+          console.error("Payment Error:", error.message);
           toast.error(error.message);
-          setLoading(false);
+          setIsProcessing(false);
           return;
         }
       } else if (paymentMethod === 'paypal') {
         toast.success('Redirecting to PayPal...');
-        setLoading(false);
+        setIsProcessing(false);
       } else {
         orderData.isPaid = false;
         await api.post('/orders/create', orderData);
         clearCart();
-        navigate('/payment-success');
+        navigate('/order-complete');
       }
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || 'Checkout failed');
-      setLoading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -135,14 +179,30 @@ const CheckoutForm = ({ formData, shippingMethod, setShippingMethod, shippingCos
         <h3 className="text-sm font-semibold text-neutral-900">Shipping Method</h3>
         <label className="flex items-center justify-between cursor-pointer">
           <div className="flex items-center gap-3">
-            <input type="radio" name="shipping" value="standard" checked={shippingMethod === 'standard'} onChange={() => setShippingMethod('standard')} className="w-4 h-4 accent-neutral-900" />
+            <input
+              type="radio"
+              name="shipping"
+              value="standard"
+              checked={shippingMethod === 'standard'}
+              onChange={() => setShippingMethod('standard')}
+              className="w-4 h-4 accent-neutral-900"
+              disabled={isProcessing}
+            />
             <span className="text-sm font-medium text-neutral-900">Standard Shipping</span>
           </div>
-          <span className="text-sm font-medium text-neutral-700">$9.99</span>
+          <span className="text-sm font-medium text-neutral-700">${(subtotal > 100 ? 0 : 9.99).toFixed(2)}</span>
         </label>
         <label className="flex items-center justify-between cursor-pointer">
           <div className="flex items-center gap-3">
-            <input type="radio" name="shipping" value="urgent" checked={shippingMethod === 'urgent'} onChange={() => setShippingMethod('urgent')} className="w-4 h-4 accent-neutral-900" />
+            <input
+              type="radio"
+              name="shipping"
+              value="urgent"
+              checked={shippingMethod === 'urgent'}
+              onChange={() => setShippingMethod('urgent')}
+              className="w-4 h-4 accent-neutral-900"
+              disabled={isProcessing}
+            />
             <span className="text-sm font-medium text-neutral-900">Expedited Shipping</span>
           </div>
           <span className="text-sm font-medium text-neutral-700">$15.00</span>
@@ -159,7 +219,15 @@ const CheckoutForm = ({ formData, shippingMethod, setShippingMethod, shippingCos
         {/* Credit / Debit Card */}
         <div className={`border rounded-lg p-3 transition-colors ${paymentMethod === 'card' ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200'}`}>
           <label className="flex items-center gap-3 cursor-pointer">
-            <input type="radio" name="payment" value="card" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} className="w-4 h-4 accent-neutral-900" />
+            <input
+              type="radio"
+              name="payment"
+              value="card"
+              checked={paymentMethod === 'card'}
+              onChange={() => setPaymentMethod('card')}
+              className="w-4 h-4 accent-neutral-900"
+              disabled={isProcessing}
+            />
             <span className="text-sm font-medium text-neutral-900">Credit / Debit Card</span>
           </label>
 
@@ -173,7 +241,15 @@ const CheckoutForm = ({ formData, shippingMethod, setShippingMethod, shippingCos
         {/* PayPal */}
         <div className={`border rounded-lg p-3 transition-colors ${paymentMethod === 'paypal' ? 'border-neutral-900 bg-neutral-50' : 'border-neutral-200'}`}>
           <label className="flex items-center gap-3 cursor-pointer">
-            <input type="radio" name="payment" value="paypal" checked={paymentMethod === 'paypal'} onChange={() => setPaymentMethod('paypal')} className="w-4 h-4 accent-neutral-900" />
+            <input
+              type="radio"
+              name="payment"
+              value="paypal"
+              checked={paymentMethod === 'paypal'}
+              onChange={() => setPaymentMethod('paypal')}
+              className="w-4 h-4 accent-neutral-900"
+              disabled={isProcessing}
+            />
             <span className="text-sm font-medium text-neutral-900">PayPal</span>
           </label>
           {paymentMethod === 'paypal' && (
@@ -185,12 +261,19 @@ const CheckoutForm = ({ formData, shippingMethod, setShippingMethod, shippingCos
       {/* ── Price breakdown + Place Order (rendered inside form for mobile) ── */}
       <div className="lg:hidden bg-white rounded-xl border border-neutral-200 p-5 space-y-3">
         <PriceSummary subtotal={subtotal} shippingCost={shippingCost} tax={tax} finalTotal={finalTotal} />
-        <PlaceOrderButton loading={loading} stripe={stripe} elements={elements} paymentMethod={paymentMethod} finalTotal={finalTotal} onClick={handlePlaceOrder} />
+        <PlaceOrderButton
+          isProcessing={isProcessing}
+          stripe={stripe}
+          elements={elements}
+          paymentMethod={paymentMethod}
+          finalTotal={finalTotal}
+          onClick={handlePlaceOrder}
+        />
       </div>
 
       {/* expose handler upward so the right-column button can also call it */}
       <PlaceOrderButton
-        loading={loading}
+        isProcessing={isProcessing}
         stripe={stripe}
         elements={elements}
         paymentMethod={paymentMethod}
@@ -203,34 +286,8 @@ const CheckoutForm = ({ formData, shippingMethod, setShippingMethod, shippingCos
   );
 };
 
-// ── Small helper components ──────────────────────────────────────────────────
-const PriceSummary = ({ subtotal, shippingCost, tax, finalTotal }) => (
-  <div className="space-y-2 text-sm text-neutral-600">
-    <div className="flex justify-between"><span>Subtotal</span><span className="font-medium text-neutral-900">${subtotal.toFixed(2)}</span></div>
-    <div className="flex justify-between"><span>Shipping</span><span className="font-medium text-neutral-900">${shippingCost.toFixed(2)}</span></div>
-    <div className="flex justify-between"><span>Tax (8%)</span><span className="font-medium text-neutral-900">${tax.toFixed(2)}</span></div>
-    <div className="flex justify-between text-base font-bold text-neutral-900 pt-3 border-t border-neutral-200">
-      <span>Total</span><span>${finalTotal.toFixed(2)}</span>
-    </div>
-  </div>
-);
-
-const PlaceOrderButton = ({ loading, stripe, elements, paymentMethod, finalTotal, onClick, hidden, id }) => {
-  const isCardNotReady = paymentMethod === 'card' && (!stripe || !elements);
-  return (
-    <button
-      id={id}
-      onClick={onClick}
-      disabled={isCardNotReady || loading}
-      className={`w-full btn-primary btn-lg rounded-xl ${hidden ? 'sr-only' : ''}`}
-    >
-      {loading ? 'Processing...' : `Place Order • $${finalTotal.toFixed(2)}`}
-    </button>
-  );
-};
-
-// ─── Root Checkout component ──────────────────────────────────────────────────
-const Checkout = () => {
+// ─── Parent Component (CheckoutPage) ──────────────────────────────────────────
+const CheckoutPage = () => {
   const { items, totalPrice } = useCartStore();
   const { user } = useAuthStore();
   const navigate  = useNavigate();
@@ -245,6 +302,8 @@ const Checkout = () => {
     state: '',
     zip: '',
   });
+  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [isFormProcessing, setIsFormProcessing] = useState(false);
 
   const subtotal    = totalPrice();
   const shippingCost = shippingMethod === 'urgent' ? 15.00 : (subtotal > 100 ? 0 : 9.99);
@@ -254,6 +313,7 @@ const Checkout = () => {
   const handleChange = (e) =>
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
+  // Pull Client Secret exactly ONCE on mount
   useEffect(() => {
     if (items.length === 0) { navigate('/cart'); return; }
     if (!stripePromise)     { setClientSecret('unconfigured'); return; }
@@ -269,7 +329,7 @@ const Checkout = () => {
             size:     i.size,
             image:    i.image,
           })),
-          shippingPrice: shippingCost,
+          shippingPrice: shippingMethod === 'urgent' ? 15.00 : (totalPrice() > 100 ? 0 : 9.99),
         });
         setClientSecret(data.clientSecret);
       } catch (err) {
@@ -279,9 +339,10 @@ const Checkout = () => {
     };
 
     fetchIntent();
-  }, [items, shippingMethod, navigate, shippingCost]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // ✅ Stable options object — only recreated when clientSecret actually changes
+  // Stable Options object
   const stripeOptions = useMemo(() => {
     if (!clientSecret) return null;
     return {
@@ -290,7 +351,6 @@ const Checkout = () => {
     };
   }, [clientSecret]);
 
-  // ── Loading state ──
   if (!clientSecret) {
     return (
       <div className="min-h-screen bg-[#FDFBF9] pt-24 pb-16 flex items-center justify-center">
@@ -302,7 +362,6 @@ const Checkout = () => {
     );
   }
 
-  // ── Stripe not configured ──
   if (!stripePromise) {
     return (
       <div className="min-h-screen bg-[#FDFBF9] pt-24 pb-16 flex items-center justify-center">
@@ -328,12 +387,26 @@ const Checkout = () => {
           <span>Order Complete</span>
         </nav>
 
+        {/* Development Mode Badge */}
+        {import.meta.env.MODE === 'development' && (
+          <div className="mb-8 flex items-center justify-between p-4 bg-amber-50/60 border border-amber-200/80 rounded-xl shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <div>
+                <p className="text-xs font-bold text-amber-900 uppercase tracking-wider">DEVELOPMENT MODE - Use test cards</p>
+                <p className="text-[11px] text-amber-700 mt-0.5">Use Stripe test card numbers (like 4242 4242 4242 4242) for checkout flow verification.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Two-column grid ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
 
-          {/* ════════════════════════════════════════════
-              LEFT COLUMN — Contact / Shipping / Payment
-              ════════════════════════════════════════════ */}
+          {/* LEFT COLUMN — Contact / Shipping / Payment */}
           <div className="lg:col-span-7 xl:col-span-8 space-y-6">
 
             {/* Contact & Shipping details */}
@@ -344,13 +417,15 @@ const Checkout = () => {
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">Full Name</label>
                     <input type="text" name="fullName" value={formData.fullName} onChange={handleChange}
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition"
+                      disabled={isFormProcessing}
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition disabled:opacity-60"
                       placeholder="John Doe" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">Phone Number</label>
                     <input type="tel" name="phone" value={formData.phone} onChange={handleChange}
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition"
+                      disabled={isFormProcessing}
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition disabled:opacity-60"
                       placeholder="+1 (555) 000-0000" />
                   </div>
                 </div>
@@ -358,7 +433,8 @@ const Checkout = () => {
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Address</label>
                   <input type="text" name="address" value={formData.address} onChange={handleChange}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition"
+                    disabled={isFormProcessing}
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition disabled:opacity-60"
                     placeholder="123 Fashion Ave, Suite 100" />
                 </div>
 
@@ -366,34 +442,40 @@ const Checkout = () => {
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
                     <input type="text" name="city" value={formData.city} onChange={handleChange}
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition"
+                      disabled={isFormProcessing}
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition disabled:opacity-60"
                       placeholder="New York" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">State</label>
                     <input type="text" name="state" value={formData.state} onChange={handleChange}
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition"
+                      disabled={isFormProcessing}
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition disabled:opacity-60"
                       placeholder="NY" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">ZIP</label>
                     <input type="text" name="zip" value={formData.zip} onChange={handleChange}
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition"
+                      disabled={isFormProcessing}
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition disabled:opacity-60"
                       placeholder="10001" />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Stripe Elements — wraps shipping method + payment toggles + card form */}
+            {/* Stripe Elements Provider - Mounted exactly once */}
             {clientSecret && stripeOptions ? (
               <Elements stripe={stripePromise} options={stripeOptions}>
-                <CheckoutForm
+                <EmbeddedPaymentForm
                   formData={formData}
                   shippingMethod={shippingMethod}
                   setShippingMethod={setShippingMethod}
                   shippingCost={shippingCost}
                   subtotal={subtotal}
+                  paymentMethod={paymentMethod}
+                  setPaymentMethod={setPaymentMethod}
+                  onProcessingChange={setIsFormProcessing}
                 />
               </Elements>
             ) : (
@@ -403,24 +485,17 @@ const Checkout = () => {
             )}
           </div>
 
-          {/* ════════════════════════════════════════════
-              RIGHT COLUMN — Order Summary + Totals
-              ════════════════════════════════════════════ */}
+          {/* RIGHT COLUMN — Order Summary + Totals */}
           <div className="lg:col-span-5 xl:col-span-4">
             <div className="bg-white/80 backdrop-blur-md border border-neutral-100 rounded-xl shadow-sm p-6 sticky top-24 space-y-6">
 
               <h2 className="text-xl font-bold text-neutral-900">Order Summary</h2>
 
-              {/* Product list — NO overflow-hidden or overflow-y-auto here; */}
-              {/* those classes clip absolutely-positioned badge children.  */}
-              {/* Scroll handled by max-h + overflow-y on an inner wrapper   */}
-              {/* that does NOT contain the badge's parent.                  */}
               <div className="space-y-4 pt-1">
                 {items.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-4 px-1">
                     <div className="relative h-16 w-16 shrink-0 z-10">
-                      <img src={item.image} alt={item.name} className="h-full w-full object-cover rounded-md border border-neutral-200" />
-                      {/* Badge absolutely positioned outside the image wrapper */}
+                      <img src={item.image} alt={item.title} className="h-full w-full object-cover rounded-md border border-neutral-200" />
                       <span className="absolute -top-2 -right-2 z-50 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-700 text-[10px] font-bold text-white shadow-sm">
                         {item.quantity}
                       </span>
@@ -444,11 +519,15 @@ const Checkout = () => {
                   <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                   <input
                     type="text"
+                    disabled={isFormProcessing}
                     placeholder="Discount code"
-                    className="w-full pl-8 pr-3 py-2.5 text-sm bg-neutral-50 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none transition"
+                    className="w-full pl-8 pr-3 py-2.5 text-sm bg-neutral-50 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:outline-none transition disabled:opacity-60"
                   />
                 </div>
-                <button className="px-4 py-2.5 text-sm font-medium bg-neutral-900 text-white rounded-lg hover:bg-neutral-700 transition">
+                <button
+                  disabled={isFormProcessing}
+                  className="px-4 py-2.5 text-sm font-medium bg-neutral-900 text-white rounded-lg hover:bg-neutral-700 transition disabled:opacity-50"
+                >
                   Apply
                 </button>
               </div>
@@ -463,12 +542,13 @@ const Checkout = () => {
                 </div>
               </div>
 
-              {/* Place Order — triggers the hidden button inside <Elements> */}
+              {/* Place Order Button */}
               <button
                 onClick={() => document.getElementById('place-order-trigger')?.click()}
-                className="w-full btn-primary btn-lg rounded-xl"
+                disabled={isFormProcessing}
+                className="w-full btn-primary btn-lg rounded-xl flex items-center justify-center gap-2"
               >
-                Place Order • ${finalTotal.toFixed(2)}
+                {isFormProcessing ? 'Processing...' : `Place Order • $${finalTotal.toFixed(2)}`}
               </button>
 
               <p className="text-center text-xs text-neutral-400">
@@ -479,8 +559,9 @@ const Checkout = () => {
 
         </div>
       </div>
+      <TestHelper onAutofill={setFormData} />
     </div>
   );
 };
 
-export default Checkout;
+export default CheckoutPage;
