@@ -11,6 +11,7 @@ const productRoutes = require('./src/routes/productRoutes');
 const orderRoutes = require('./src/routes/orderRoutes');
 const paymentRoutes = require('./src/routes/paymentRoutes');
 const reviewRoutes = require('./src/routes/reviewRoutes');
+const userRoutes = require('./src/routes/userRoutes');
 
 // Connect to MongoDB
 connectDB();
@@ -68,6 +69,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/users', userRoutes);
 
 // ── Error handling ─────────────────────────────────────────────────────────────
 app.use(notFound);

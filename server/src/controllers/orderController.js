@@ -3,6 +3,7 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
+const orderService = require('../services/orderService');
 
 // ── ATOMIC INVENTORY DECREMENT ─────────────────────────────────────────────────
 /**
@@ -107,7 +108,7 @@ const createOrder = asyncHandler(async (req, res, next) => {
           totalPrice,
           paymentMethod: paymentMethod || 'Card',
           paymentStatus: isPaid ? 'Paid' : 'Pending',
-          deliveryStatus: 'Processing',
+          orderStatus: 'Processing',
           stripeSessionId: stripePaymentIntentId || null, // Storing PaymentIntent ID in the same field or schema update
         },
       ],
@@ -142,11 +143,11 @@ const cancelOrder = asyncHandler(async (req, res, next) => {
   }
 
   // Only allow cancellation of non-delivered orders
-  if (order.deliveryStatus === 'Delivered') {
+  if (order.orderStatus === 'Delivered') {
     return next(new AppError('Delivered orders cannot be cancelled.', 400));
   }
 
-  if (order.deliveryStatus === 'Cancelled') {
+  if (order.orderStatus === 'Cancelled') {
     return next(new AppError('This order is already cancelled.', 400));
   }
 
@@ -160,7 +161,7 @@ const cancelOrder = asyncHandler(async (req, res, next) => {
     }
 
     // Update order status
-    order.deliveryStatus = 'Cancelled';
+    order.orderStatus = 'Cancelled';
     order.paymentStatus = order.paymentStatus === 'Paid' ? 'Refunded' : 'Failed';
     await order.save({ session });
 
@@ -212,47 +213,28 @@ const getOrderById = asyncHandler(async (req, res, next) => {
 
 // ── ADMIN: GET /api/orders ────────────────────────────────────────────────────
 const getAllOrders = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, deliveryStatus, paymentStatus, sort = 'newest' } = req.query;
-  const query = {};
-  if (deliveryStatus) query.deliveryStatus = deliveryStatus;
-  if (paymentStatus) query.paymentStatus = paymentStatus;
-
-  const sortMap = { newest: { createdAt: -1 }, oldest: { createdAt: 1 } };
-  const skip = (Number(page) - 1) * Number(limit);
-
-  const [orders, total] = await Promise.all([
-    Order.find(query)
-      .populate('user', 'name email')
-      .sort(sortMap[sort] || { createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit)),
-    Order.countDocuments(query),
-  ]);
-
+  const result = await orderService.getAdminOrders(req.query);
   res.status(200).json({
     success: true,
-    orders,
-    total,
-    page: Number(page),
-    pages: Math.ceil(total / Number(limit)),
+    ...result,
   });
 });
 
-// ── ADMIN: PUT /api/orders/:id/status ─────────────────────────────────────────
-const updateOrderStatus = asyncHandler(async (req, res, next) => {
-  const { deliveryStatus } = req.body;
+// ── ADMIN: PUT /api/orders/:id/fulfillment ────────────────────────────────────
+const updateOrderFulfillment = asyncHandler(async (req, res, next) => {
+  const { orderStatus, carrier, trackingNumber } = req.body;
   const order = await Order.findById(req.params.id);
   if (!order) return next(new AppError('Order not found.', 404));
 
   // If admin is explicitly cancelling via status update, restore inventory
-  if (deliveryStatus === 'Cancelled' && order.deliveryStatus !== 'Cancelled') {
+  if (orderStatus === 'Cancelled' && order.orderStatus !== 'Cancelled') {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
       for (const item of order.orderItems) {
         await restoreInventory(item.product, item.quantity, session);
       }
-      order.deliveryStatus = 'Cancelled';
+      order.orderStatus = 'Cancelled';
       order.paymentStatus = order.paymentStatus === 'Paid' ? 'Refunded' : 'Failed';
       await order.save({ session });
       await session.commitTransaction();
@@ -263,32 +245,49 @@ const updateOrderStatus = asyncHandler(async (req, res, next) => {
       return next(new AppError('Failed to cancel order.', 500));
     }
   } else {
-    order.deliveryStatus = deliveryStatus;
-    if (deliveryStatus === 'Delivered') order.deliveredAt = new Date();
-    await order.save();
+    if (orderStatus) order.orderStatus = orderStatus;
+    
+    if (orderStatus === 'Shipped') order.tracking.shippedAt = new Date();
+    if (orderStatus === 'Delivered') order.tracking.deliveredAt = new Date();
   }
 
-  res.status(200).json({ success: true, order });
+  if (carrier !== undefined) order.tracking.carrier = carrier;
+  if (trackingNumber !== undefined) order.tracking.trackingNumber = trackingNumber;
+
+  await order.save();
+
+  const updatedOrder = await Order.findById(order._id)
+    .populate('user', 'name email')
+    .populate('orderItems.product', 'title images sizes');
+
+  res.status(200).json({ success: true, order: updatedOrder });
 });
 
 // ── ADMIN: GET /api/orders/admin/stats ────────────────────────────────────────
 const getOrderStats = asyncHandler(async (req, res) => {
-  const [revenueStats, statusBreakdown, recentOrders, lowStockProducts] = await Promise.all([
+  const [statsResult, statusBreakdown, recentOrders, lowStockProducts, lowStockCountAgg] = await Promise.all([
     Order.aggregate([
-      { $match: { paymentStatus: 'Paid' } },
       {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: '$totalPrice' },
-          totalOrders: { $sum: 1 },
-          avgOrderValue: { $avg: '$totalPrice' },
+        $facet: {
+          revenueData: [
+            { $match: { paymentStatus: { $in: ['Paid', 'Pending'] } } },
+            { $group: { _id: null, total: { $sum: '$totalPrice' } } },
+          ],
+          orderCount: [
+            { $match: {} }, // Counts every order in the system
+            { $count: 'count' },
+          ],
+          avgValueData: [
+            { $match: { paymentStatus: { $in: ['Paid', 'Pending'] } } },
+            { $group: { _id: null, avg: { $avg: '$totalPrice' } } },
+          ],
         },
-      },
+      }
     ]),
     Order.aggregate([
       {
         $group: {
-          _id: '$deliveryStatus',
+          _id: '$orderStatus',
           count: { $sum: 1 },
         },
       },
@@ -297,16 +296,60 @@ const getOrderStats = asyncHandler(async (req, res) => {
       .populate('user', 'name email')
       .sort({ createdAt: -1 })
       .limit(5),
-    // Low stock alert for dashboard
-    Product.find({ inventoryCount: { $lte: 5 }, isPublished: true })
-      .select('title inventoryCount category')
-      .sort({ inventoryCount: 1 })
-      .limit(10),
+    // Low stock alert for dashboard (based on TOTAL stock across all variants/sizes)
+    Product.aggregate([
+      { $match: { isPublished: true } },
+      { 
+        $addFields: { 
+          totalInventory: {
+            $sum: {
+              $map: {
+                input: { $ifNull: ["$variants", []] },
+                as: "v",
+                in: { $sum: { $ifNull: ["$$v.sizes.inventoryCount", []] } }
+              }
+            }
+          }
+        }
+      },
+      { $match: { totalInventory: { $lt: 10 } } },
+      { $sort: { totalInventory: 1 } },
+      { $limit: 10 },
+      { $project: { title: 1, category: 1, inventoryCount: "$totalInventory" } }
+    ]),
+    Product.aggregate([
+      { $match: { isPublished: true } },
+      { 
+        $addFields: { 
+          totalInventory: {
+            $sum: {
+              $map: {
+                input: { $ifNull: ["$variants", []] },
+                as: "v",
+                in: { $sum: { $ifNull: ["$$v.sizes.inventoryCount", []] } }
+              }
+            }
+          }
+        }
+      },
+      { $match: { totalInventory: { $lt: 10 } } },
+      { $count: "count" }
+    ])
   ]);
+
+  const totalRevenue = statsResult[0]?.revenueData[0]?.total || 0;
+  const totalOrders = statsResult[0]?.orderCount[0]?.count || 0;
+  const avgOrderValue = statsResult[0]?.avgValueData[0]?.avg || 0;
+  const lowStockCountFinal = lowStockCountAgg.length > 0 ? lowStockCountAgg[0].count : 0;
 
   res.status(200).json({
     success: true,
-    stats: revenueStats[0] || { totalRevenue: 0, totalOrders: 0, avgOrderValue: 0 },
+    stats: {
+      totalRevenue: Number(totalRevenue.toFixed(2)),
+      totalOrders,
+      avgOrderValue: Number(avgOrderValue.toFixed(2)),
+      lowStockItems: lowStockCountFinal,
+    },
     statusBreakdown,
     recentOrders,
     lowStockProducts,
@@ -319,6 +362,6 @@ module.exports = {
   getMyOrders,
   getOrderById,
   getAllOrders,
-  updateOrderStatus,
+  updateOrderFulfillment,
   getOrderStats,
 };

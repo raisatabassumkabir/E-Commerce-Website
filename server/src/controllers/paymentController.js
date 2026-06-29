@@ -48,7 +48,7 @@ const processOrderCreation = async ({ userId, compactCartItems, shippingAddress,
     const taxPrice = Number((0.08 * itemsPrice).toFixed(2));
     const totalPrice = Number((itemsPrice + shippingPrice + taxPrice).toFixed(2));
 
-    let deliveryStatus = 'Processing';
+    let orderStatus = 'Processing';
     if (inventoryFailures.length > 0) {
       console.warn(`⚠️ Oversell detected for Stripe transaction.`);
     }
@@ -63,7 +63,7 @@ const processOrderCreation = async ({ userId, compactCartItems, shippingAddress,
       totalPrice,
       paymentMethod: stripePaymentIntentId ? 'Card' : 'Stripe',
       paymentStatus: 'Paid',
-      deliveryStatus,
+      orderStatus,
       stripeSessionId: stripeSessionId || stripePaymentIntentId,
       paidAt: new Date()
     });

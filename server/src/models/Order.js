@@ -10,8 +10,8 @@ const orderItemSchema = new mongoose.Schema({
   image: { type: String, required: true },
   price: { type: Number, required: true },
   quantity: { type: Number, required: true, min: 1 },
-  size: { type: String, required: true },
-  color: { type: String, default: '' },
+  size: { type: String, default: 'N/A' },
+  color: { type: String, default: 'N/A' },
 });
 
 const shippingAddressSchema = new mongoose.Schema({
@@ -45,10 +45,16 @@ const orderSchema = new mongoose.Schema(
       enum: ['Pending', 'Paid', 'Failed', 'Refunded'],
       default: 'Pending',
     },
-    deliveryStatus: {
+    orderStatus: {
       type: String,
-      enum: ['Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'],
-      default: 'Processing',
+      enum: ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'],
+      default: 'Pending',
+    },
+    tracking: {
+      carrier: { type: String, default: '' },
+      trackingNumber: { type: String, default: '' },
+      shippedAt: { type: Date },
+      deliveredAt: { type: Date },
     },
     stripeSessionId: {
       type: String,

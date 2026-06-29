@@ -92,7 +92,7 @@ const AdminLayout = () => {
               <button
                 id="admin-logout"
                 onClick={handleLogout}
-                className="flex items-center gap-2 w-full px-3 py-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors text-xs"
+                className="flex items-center gap-2 w-full px-3 py-2 text-red-500 hover:bg-red-50/50 hover:text-red-700 rounded-lg transition-colors text-xs font-medium"
               >
                 <LogOut size={14} /> Sign Out
               </button>
