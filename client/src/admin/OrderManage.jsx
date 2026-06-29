@@ -295,16 +295,21 @@ const OrderManage = () => {
         <div className="fixed inset-0 z-50 flex justify-end">
           {/* Backdrop */}
           <div 
-            className="absolute inset-0 bg-neutral-900/20 backdrop-blur-sm transition-opacity"
+            className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
             onClick={closeDrawer}
           />
           
           {/* Drawer Panel */}
-          <div className="relative w-full max-w-[420px] h-full bg-white/90 backdrop-blur-xl shadow-2xl flex flex-col transform transition-transform duration-300 translate-x-0 border-l border-white/50">
+          <div className="relative w-full max-w-md h-full bg-white/95 backdrop-blur-md shadow-2xl overflow-y-auto flex flex-col animate-slide-in-right border-l border-neutral-200/60">
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-neutral-200/50">
               <div>
-                <h2 className="text-lg font-bold text-neutral-900">Order #{selectedOrder._id.slice(-8).toUpperCase()}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-neutral-900">Order #{selectedOrder._id.slice(-8).toUpperCase()}</h2>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${STATUS_COLORS[selectedOrder.orderStatus] || STATUS_COLORS.Pending}`}>
+                    {selectedOrder.orderStatus}
+                  </span>
+                </div>
                 <p className="text-xs text-neutral-500 mt-1">{new Date(selectedOrder.createdAt).toLocaleString()}</p>
               </div>
               <button onClick={closeDrawer} className="p-2 bg-neutral-100 hover:bg-neutral-200 rounded-full text-neutral-500 transition-colors">
@@ -327,7 +332,7 @@ const OrderManage = () => {
                   </div>
                   <div>
                     <h3 className="font-bold text-neutral-900">{selectedOrder.user?.name}</h3>
-                    <p className="text-sm text-neutral-500">Customer</p>
+                    <p className="text-sm text-neutral-500">{selectedOrder.user?.email}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -346,15 +351,15 @@ const OrderManage = () => {
                   <Package size={14} /> Order Items
                 </h4>
                 <div className="space-y-3">
-                  {selectedOrder.orderItems?.map((item, idx) => (
+                  {(selectedOrder.orderItems || selectedOrder.items || []).map((item, idx) => (
                     <div key={item._id || idx} className="flex gap-3 bg-white/50 border border-neutral-200/60 p-3 rounded-xl shadow-sm">
                       <div className="w-16 h-16 rounded-lg bg-neutral-100 overflow-hidden border border-neutral-200 flex-shrink-0">
                         <img src={item.image || item.product?.images?.[0]?.url} alt={item.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-neutral-900 text-sm truncate">{item.title || item.product?.title}</p>
+                        <p className="font-semibold text-neutral-900 text-sm truncate">{item.title || item.product?.title || item.name}</p>
                         <div className="flex flex-wrap gap-1.5 mt-1">
-                          <span className="text-[10px] bg-neutral-200/60 text-neutral-700 px-1.5 py-0.5 rounded font-medium border border-neutral-300/50">Size: {item.size}</span>
+                          <span className="text-[10px] bg-neutral-200/60 text-neutral-700 px-1.5 py-0.5 rounded font-medium border border-neutral-300/50">Size: {item.size || 'N/A'}</span>
                           {item.color && item.color !== 'N/A' && (
                             <span className="text-[10px] bg-neutral-200/60 text-neutral-700 px-1.5 py-0.5 rounded font-medium border border-neutral-300/50">Color: {item.color}</span>
                           )}
@@ -362,7 +367,7 @@ const OrderManage = () => {
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className="font-bold text-neutral-900 text-sm">${(item.price || item.product?.price)?.toFixed(2)}</p>
-                        <p className="text-xs text-neutral-500 mt-1">Qty: {item.quantity}</p>
+                        <p className="text-xs text-neutral-500 mt-1">Qty: {item.quantity || item.qty}</p>
                       </div>
                     </div>
                   ))}
@@ -432,13 +437,17 @@ const OrderManage = () => {
 
             {/* Footer Actions */}
             <div className="p-5 border-t border-neutral-200/50 bg-neutral-50/80 backdrop-blur-md">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm font-semibold text-neutral-500">Total Price</span>
+                <span className="text-lg font-bold text-neutral-900">${selectedOrder.totalPrice?.toFixed(2)}</span>
+              </div>
               <div className="flex flex-col gap-3">
                 <button
                   onClick={handleUpdateFulfillment}
                   disabled={updating}
                   className="w-full py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg font-medium text-sm shadow-md transition-all flex items-center justify-center gap-2"
                 >
-                  {updating ? <Spinner size="sm" color="white" /> : 'Save Changes'}
+                  {updating ? <Spinner size="sm" color="white" /> : 'Update Status'}
                 </button>
                 <div className="flex gap-3">
                   <button 
