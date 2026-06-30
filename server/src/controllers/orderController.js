@@ -12,38 +12,159 @@ const orderService = require('../services/orderService');
  *
  * Returns the updated product, or null if stock was insufficient.
  */
-const decrementInventory = async (productId, quantity, session) => {
-  return Product.findOneAndUpdate(
-    {
-      _id: productId,
-      inventoryCount: { $gte: quantity }, // Safety guard: only update if enough stock
-    },
-    { $inc: { inventoryCount: -quantity } },
-    { new: true, session } // Use MongoDB session for transaction support
+const decrementInventory = async (productId, quantity, session, size, color) => {
+  const product = await Product.findById(productId).session(session);
+  if (!product) return null;
+
+  let variant = product.variants.find(
+    (v) => v.color.toLowerCase() === (color || '').toLowerCase()
   );
+  if (!variant) {
+    variant = product.variants[0];
+  }
+  if (!variant) return null;
+
+  const sizeObj = variant.sizes.find(
+    (s) => s.size.toLowerCase() === (size || '').toLowerCase()
+  );
+  if (!sizeObj || sizeObj.inventoryCount < quantity) {
+    return null;
+  }
+
+  sizeObj.inventoryCount -= quantity;
+  await product.save({ session });
+  return product;
 };
 
-/**
- * Atomically restores inventoryCount when an order is cancelled or payment fails.
- */
-const restoreInventory = async (productId, quantity, session) => {
-  return Product.findByIdAndUpdate(
-    productId,
-    { $inc: { inventoryCount: +quantity } },
-    { new: true, session }
+const restoreInventory = async (productId, quantity, session, size, color) => {
+  const product = await Product.findById(productId).session(session);
+  if (!product) return null;
+
+  let variant = product.variants.find(
+    (v) => v.color.toLowerCase() === (color || '').toLowerCase()
   );
+  if (!variant) {
+    variant = product.variants[0];
+  }
+  if (!variant) return null;
+
+  const sizeObj = variant.sizes.find(
+    (s) => s.size.toLowerCase() === (size || '').toLowerCase()
+  );
+  if (sizeObj) {
+    sizeObj.inventoryCount += quantity;
+    await product.save({ session });
+  }
+  return product;
 };
 
 // ── POST /api/orders ───────────────────────────────────────────────────────────
 const createOrder = asyncHandler(async (req, res, next) => {
-  const { cartItems, orderItems, shippingAddress, paymentMethod, isPaid, stripePaymentIntentId } = req.body;
+  const { orderId, cartItems, orderItems, shippingAddress, paymentMethod, isPaid, stripePaymentIntentId } = req.body;
   const items = cartItems || orderItems;
 
   if (!items || items.length === 0) {
     return next(new AppError('No items in the order.', 400));
   }
 
-  // ── Use MongoDB session for atomic multi-document transaction ──────────────
+  // Deduplicate: Check if an order already exists for this payment intent
+  if (stripePaymentIntentId) {
+    const existingOrder = await Order.findOne({ stripeSessionId: stripePaymentIntentId });
+    if (existingOrder) {
+      return res.status(201).json({ success: true, order: existingOrder });
+    }
+  }
+
+  // 1. If orderId is provided, we are transitioning a Pending Order to Paid
+  if (orderId && mongoose.Types.ObjectId.isValid(orderId)) {
+    const existingOrder = await Order.findById(orderId);
+    if (existingOrder) {
+      // If already Paid, return success immediately to prevent double inventory deduction
+      if (existingOrder.paymentStatus === 'Paid') {
+        return res.status(201).json({ success: true, order: existingOrder });
+      }
+
+      const session = await mongoose.startSession();
+      session.startTransaction();
+
+      try {
+        // Step 1: Verify products and prices server-side
+        const verifiedItems = [];
+        for (const item of items) {
+          const product = await Product.findById(item.product).session(session);
+          if (!product || !product.isPublished) {
+            throw new AppError(`Product not found: ${item.product}`, 404);
+          }
+          const sizeExists = product.variants?.some(v => v.sizes?.some(s => s.size === item.size)) || false;
+          if (!sizeExists) {
+            throw new AppError(`Size "${item.size}" is not available for: ${product.title}`, 400);
+          }
+
+          verifiedItems.push({
+            product: product._id,
+            title: product.title,
+            image: product.images[0]?.url || '',
+            price: product.price,
+            quantity: item.quantity,
+            size: item.size,
+            color: item.color || '',
+          });
+        }
+
+        // Step 2: Atomically decrement inventory for each item
+        const inventoryFailures = [];
+        for (const item of verifiedItems) {
+          const updated = await decrementInventory(item.product, item.quantity, session, item.size, item.color);
+          if (!updated) {
+            const prod = await Product.findById(item.product).select('title inventoryCount').session(session);
+            inventoryFailures.push(
+              `"${prod?.title || item.product}" — requested ${item.quantity}, available: ${prod?.inventoryCount ?? 0}`
+            );
+          }
+        }
+
+        if (inventoryFailures.length > 0) {
+          throw new AppError(
+            `Insufficient stock for: ${inventoryFailures.join('; ')}. Please adjust your cart and try again.`,
+            400
+          );
+        }
+
+        // Step 3: Calculate pricing
+        const itemsPrice = verifiedItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
+        const shippingPrice = req.body.shippingPrice !== undefined ? Number(req.body.shippingPrice) : (itemsPrice > 100 ? 0 : 9.99);
+        const taxPrice = Number((0.08 * itemsPrice).toFixed(2));
+        const totalPrice = Number((itemsPrice + shippingPrice + taxPrice).toFixed(2));
+
+        // Step 4: Update the pending order
+        existingOrder.orderItems = verifiedItems;
+        existingOrder.shippingAddress = shippingAddress;
+        existingOrder.itemsPrice = itemsPrice;
+        existingOrder.shippingPrice = shippingPrice;
+        existingOrder.taxPrice = taxPrice;
+        existingOrder.totalPrice = totalPrice;
+        existingOrder.paymentMethod = paymentMethod || 'Card';
+        existingOrder.paymentStatus = isPaid ? 'Paid' : 'Pending';
+        existingOrder.orderStatus = isPaid ? 'Processing' : 'Pending';
+        existingOrder.stripeSessionId = stripePaymentIntentId || existingOrder.stripeSessionId;
+        if (isPaid) {
+          existingOrder.paidAt = new Date();
+        }
+
+        await existingOrder.save({ session });
+        await session.commitTransaction();
+        session.endSession();
+
+        return res.status(200).json({ success: true, order: existingOrder });
+      } catch (err) {
+        await session.abortTransaction();
+        session.endSession();
+        return next(err instanceof AppError ? err : new AppError(err.message, 500));
+      }
+    }
+  }
+
+  // 2. Fallback: Create new order if no orderId is supplied (e.g. cash on delivery/standard flow)
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -55,7 +176,8 @@ const createOrder = asyncHandler(async (req, res, next) => {
       if (!product || !product.isPublished) {
         throw new AppError(`Product not found: ${item.product}`, 404);
       }
-      if (!product.sizes.includes(item.size)) {
+      const sizeExists = product.variants?.some(v => v.sizes?.some(s => s.size === item.size)) || false;
+      if (!sizeExists) {
         throw new AppError(`Size "${item.size}" is not available for: ${product.title}`, 400);
       }
 
@@ -63,7 +185,7 @@ const createOrder = asyncHandler(async (req, res, next) => {
         product: product._id,
         title: product.title,
         image: product.images[0]?.url || '',
-        price: product.price, // ALWAYS server-side price — never client-submitted
+        price: product.price,
         quantity: item.quantity,
         size: item.size,
         color: item.color || '',
@@ -73,7 +195,7 @@ const createOrder = asyncHandler(async (req, res, next) => {
     // Step 2: Atomically decrement inventory for each item
     const inventoryFailures = [];
     for (const item of verifiedItems) {
-      const updated = await decrementInventory(item.product, item.quantity, session);
+      const updated = await decrementInventory(item.product, item.quantity, session, item.size, item.color);
       if (!updated) {
         const prod = await Product.findById(item.product).select('title inventoryCount').session(session);
         inventoryFailures.push(
@@ -108,20 +230,19 @@ const createOrder = asyncHandler(async (req, res, next) => {
           totalPrice,
           paymentMethod: paymentMethod || 'Card',
           paymentStatus: isPaid ? 'Paid' : 'Pending',
-          orderStatus: 'Processing',
-          stripeSessionId: stripePaymentIntentId || null, // Storing PaymentIntent ID in the same field or schema update
+          orderStatus: isPaid ? 'Processing' : 'Pending',
+          stripeSessionId: stripePaymentIntentId || null,
+          paidAt: isPaid ? new Date() : null,
         },
       ],
       { session }
     );
 
-    // Commit the transaction
     await session.commitTransaction();
     session.endSession();
 
     res.status(201).json({ success: true, order });
   } catch (err) {
-    // Rollback all changes (inventory decrements are also rolled back)
     await session.abortTransaction();
     session.endSession();
     return next(err instanceof AppError ? err : new AppError(err.message, 500));
@@ -157,7 +278,7 @@ const cancelOrder = asyncHandler(async (req, res, next) => {
   try {
     // Restore inventory for every item in the order
     for (const item of order.orderItems) {
-      await restoreInventory(item.product, item.quantity, session);
+      await restoreInventory(item.product, item.quantity, session, item.size, item.color);
     }
 
     // Update order status
@@ -232,7 +353,7 @@ const updateOrderFulfillment = asyncHandler(async (req, res, next) => {
     session.startTransaction();
     try {
       for (const item of order.orderItems) {
-        await restoreInventory(item.product, item.quantity, session);
+        await restoreInventory(item.product, item.quantity, session, item.size, item.color);
       }
       order.orderStatus = 'Cancelled';
       order.paymentStatus = order.paymentStatus === 'Paid' ? 'Refunded' : 'Failed';

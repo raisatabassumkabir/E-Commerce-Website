@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNavigate, Link } from 'react-router-dom';
@@ -57,6 +57,7 @@ const PlaceOrderButton = ({ isProcessing, stripe, elements, paymentMethod, final
 
 // ─── Child Component (Stripe isolated form) ──────────────────────────────────
 const EmbeddedPaymentForm = ({
+  orderId,
   formData,
   shippingMethod,
   setShippingMethod,
@@ -158,14 +159,14 @@ const EmbeddedPaymentForm = ({
           return;
         } else if (paymentIntent && paymentIntent.status === 'succeeded') {
           clearCart();
-          window.location.href = '/order-complete';
+          window.location.href = `/order-complete?session_id=${paymentIntent.id}`;
         }
       } else if (paymentMethod === 'paypal') {
         toast.success('Redirecting to PayPal...');
         setIsProcessing(false);
       } else {
         orderData.isPaid = false;
-        await api.post('/orders/create', orderData);
+        await api.post('/orders', orderData);
         clearCart();
         navigate('/order-complete');
       }
@@ -298,6 +299,7 @@ const CheckoutPage = () => {
 
   const [shippingMethod, setShippingMethod] = useState('standard');
   const [clientSecret, setClientSecret]     = useState('');
+  const [orderId, setOrderId]               = useState('');
   const [formData, setFormData] = useState({
     fullName: user?.name || '',
     phone: '',
@@ -317,14 +319,20 @@ const CheckoutPage = () => {
   const handleChange = (e) =>
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
+  const hasInitialized = useRef(false);
+
   // Pull Client Secret exactly ONCE on mount
   useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
     if (items.length === 0) { navigate('/cart'); return; }
     if (!stripePromise)     { setClientSecret('unconfigured'); return; }
 
     const fetchIntent = async () => {
       try {
         const { data } = await api.post('/payment/create-payment-intent', {
+          userId: user?._id,
           cartItems: items.map(i => ({
             product:  i.product,
             quantity: i.quantity,
@@ -336,6 +344,7 @@ const CheckoutPage = () => {
           shippingPrice: shippingMethod === 'urgent' ? 15.00 : (totalPrice() > 100 ? 0 : 9.99),
         });
         setClientSecret(data.clientSecret);
+        setOrderId(data.orderId);
       } catch (err) {
         console.error('Failed to fetch payment intent:', err);
         toast.error('Could not initialise payment. Please try again.');
@@ -472,6 +481,7 @@ const CheckoutPage = () => {
             {clientSecret && stripeOptions ? (
               <Elements stripe={stripePromise} options={stripeOptions}>
                 <EmbeddedPaymentForm
+                  orderId={orderId}
                   formData={formData}
                   shippingMethod={shippingMethod}
                   setShippingMethod={setShippingMethod}

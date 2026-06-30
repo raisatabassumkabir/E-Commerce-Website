@@ -5,13 +5,88 @@ const Product = require('../models/Product');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 
-// ── Atomic inventory helpers ─────────────────────────────────────────────────
-const decrementInventory = async (productId, quantity, session) =>
-  Product.findOneAndUpdate(
-    { _id: productId, inventoryCount: { $gte: quantity } },
-    { $inc: { inventoryCount: -quantity } },
-    { new: true, session }
+const decrementInventory = async (productId, quantity, session, size, color) => {
+  const product = await Product.findById(productId).session(session);
+  if (!product) return null;
+
+  let variant = product.variants.find(
+    (v) => v.color.toLowerCase() === (color || '').toLowerCase()
   );
+  if (!variant) {
+    variant = product.variants[0];
+  }
+  if (!variant) return null;
+
+  const sizeObj = variant.sizes.find(
+    (s) => s.size.toLowerCase() === (size || '').toLowerCase()
+  );
+  if (!sizeObj || sizeObj.inventoryCount < quantity) {
+    return null;
+  }
+
+  sizeObj.inventoryCount -= quantity;
+  await product.save({ session });
+  return product;
+};
+
+// Helper to mark an existing pending order as Paid, decrement inventory, and update shipping details
+const processOrderPaid = async ({ orderId, stripeSessionId, shipping }) => {
+  if (!orderId || !mongoose.Types.ObjectId.isValid(orderId)) {
+    throw new Error('Invalid Order ID');
+  }
+
+  const order = await Order.findById(orderId);
+  if (!order) {
+    console.error(`[WEBHOOK WARNING] Order ${orderId} not found in DB. Payment succeeded but no order exists.`);
+    return null;
+  }
+
+  if (order.paymentStatus === 'Paid') {
+    console.log(`ℹ️ Order ${orderId} is already marked as Paid.`);
+    return order;
+  }
+
+  const mongoSession = await mongoose.startSession();
+  mongoSession.startTransaction();
+
+  try {
+    // Decrement inventory for each item in the order
+    for (const item of order.orderItems) {
+      const updated = await decrementInventory(item.product, item.quantity, mongoSession, item.size, item.color);
+      if (!updated) {
+        console.warn(`⚠️ Oversell detected for product ${item.product} in order ${orderId}`);
+      }
+    }
+
+    if (shipping && shipping.address) {
+      order.shippingAddress = {
+        fullName: shipping.name || order.shippingAddress?.fullName || 'Anonymous',
+        street: shipping.address.line1 || order.shippingAddress?.street || '',
+        city: shipping.address.city || order.shippingAddress?.city || '',
+        state: shipping.address.state || order.shippingAddress?.state || '',
+        postalCode: shipping.address.postal_code || order.shippingAddress?.postalCode || '',
+        country: shipping.address.country || order.shippingAddress?.country || 'US',
+      };
+    }
+
+    order.paymentStatus = 'Paid';
+    order.orderStatus = 'Processing';
+    order.stripeSessionId = stripeSessionId;
+    order.paidAt = new Date();
+
+    await order.save({ session: mongoSession });
+    await mongoSession.commitTransaction();
+    mongoSession.endSession();
+
+    console.log(`✅ Order ${orderId} successfully marked as Paid.`);
+    return order;
+  } catch (err) {
+    await mongoSession.abortTransaction();
+    mongoSession.endSession();
+    console.error(`❌ Webhook order confirmation failed for ${orderId}:`, err);
+    throw err;
+  }
+};
 
 // Helper to construct and save the order in MongoDB using a Mongoose Transaction
 const processOrderCreation = async ({ userId, compactCartItems, shippingAddress, stripeSessionId, stripePaymentIntentId }) => {
@@ -19,6 +94,11 @@ const processOrderCreation = async ({ userId, compactCartItems, shippingAddress,
   mongoSession.startTransaction();
 
   try {
+    let validUserId = null;
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      validUserId = userId;
+    }
+
     const orderItems = [];
     let itemsPrice = 0;
     const inventoryFailures = [];
@@ -54,7 +134,7 @@ const processOrderCreation = async ({ userId, compactCartItems, shippingAddress,
     }
 
     const order = new Order({
-      user: userId,
+      user: validUserId,
       orderItems,
       shippingAddress,
       itemsPrice,
@@ -101,48 +181,102 @@ const createPaymentIntent = asyncHandler(async (req, res, next) => {
     }
   }
 
-  const verifiedItems = [];
-  const compactCartItems = [];
+  const orderItems = [];
+  let itemsPrice = 0;
   for (const item of cartItems) {
     const product = await Product.findById(item.product);
     if (!product || !product.isPublished) {
       return next(new AppError(`Product not found: ${item.title || item.name}`, 404));
     }
-    if (product.inventoryCount < item.quantity) {
-      return next(new AppError(`"${product.title}" only has ${product.inventoryCount} unit(s) left.`, 400));
+    
+    let variant = product.variants.find(
+      (v) => v.color.toLowerCase() === (item.color || '').toLowerCase()
+    );
+    if (!variant) {
+      variant = product.variants[0];
     }
-    verifiedItems.push({
+    const sizeObj = variant?.sizes?.find(
+      (s) => s.size.toLowerCase() === (item.size || '').toLowerCase()
+    );
+    const stock = sizeObj ? sizeObj.inventoryCount : 0;
+    if (stock < item.quantity) {
+      return next(
+        new AppError(
+          `"${product.title}" (Size: ${item.size}${item.color ? `, Color: ${item.color}` : ''}) only has ${stock} unit(s) left.`,
+          400
+        )
+      );
+    }
+
+    orderItems.push({
+      product: product._id,
+      title: product.title,
+      image: product.images[0]?.url || '',
       price: product.price,
       quantity: item.quantity,
+      size: item.size || 'N/A',
+      color: item.color || 'N/A',
     });
-    
-    compactCartItems.push({
-      p: product._id.toString(),
-      q: item.quantity,
-      s: item.size || '',
-      c: item.color || ''
+    itemsPrice += product.price * item.quantity;
+  }
+
+  const finalShippingPrice = shippingPrice !== undefined ? Number(shippingPrice) : (itemsPrice > 100 ? 0 : 9.99);
+  const tax = Number((itemsPrice * 0.08).toFixed(2));
+  const totalPrice = Number((itemsPrice + finalShippingPrice + tax).toFixed(2));
+  const totalAmount = Math.round(totalPrice * 100);
+
+  const bodyUserId = req.body.userId;
+  const finalUserId = (bodyUserId && mongoose.Types.ObjectId.isValid(bodyUserId))
+    ? bodyUserId
+    : (req.user?._id ? req.user._id.toString() : null);
+
+  // 1. Aggressively wipe out any stale/ghost pending orders for this user to avoid any duplicate listings
+  if (finalUserId) {
+    await Order.deleteMany({
+      user: finalUserId,
+      paymentStatus: 'Pending',
     });
   }
 
-  const itemsPrice = verifiedItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
-  const finalShippingPrice = shippingPrice !== undefined ? Number(shippingPrice) : (itemsPrice > 100 ? 0 : 9.99);
-  const tax = Number((itemsPrice * 0.08).toFixed(2));
-  
-  // Total in cents
-  const totalAmount = Math.round((itemsPrice + finalShippingPrice + tax) * 100);
+  // 2. Create the single, fresh Pending order
+  const order = await Order.create({
+    user: finalUserId,
+    orderItems,
+    shippingAddress: {
+      fullName: req.user?.name || 'Guest Checkout',
+      street: 'Pending',
+      city: 'Pending',
+      state: 'Pending',
+      postalCode: 'Pending',
+      country: 'US',
+    },
+    itemsPrice,
+    shippingPrice: finalShippingPrice,
+    taxPrice: tax,
+    totalPrice,
+    paymentMethod: 'Card',
+    paymentStatus: 'Pending',
+    orderStatus: 'Pending',
+  });
 
+  // GUARD CLAUSE: Do not proceed to Stripe if DB creation failed
+  if (!order || !order._id) {
+    return next(new AppError("Database failed to generate Pending Order.", 500));
+  }
+
+  // 2. Create Stripe Intent with ONLY the Order ID
   const paymentIntent = await stripe.paymentIntents.create({
     amount: totalAmount,
     currency: 'usd',
     automatic_payment_methods: { enabled: true },
     metadata: {
-      userId: req.user._id.toString(),
-      cartItems: JSON.stringify(compactCartItems).substring(0, 500),
+      orderId: order._id.toString(),
     },
   });
 
   res.status(200).json({
     clientSecret: paymentIntent.client_secret,
+    orderId: order._id.toString(),
   });
 });
 
@@ -269,59 +403,96 @@ const stripeWebhook = async (req, res) => {
   try {
     if (event.type === 'checkout.session.completed') {
       const stripeSession = event.data.object;
-      const metadata = stripeSession.metadata;
-      const userId = metadata.userId;
-      const compactCartItems = JSON.parse(metadata.cartItems || '[]');
-      const shippingAddress = JSON.parse(metadata.shippingAddress || '{}');
+      try {
+        const metadata = stripeSession.metadata || {};
+        const orderId = metadata.orderId;
+        const userId = metadata.userId;
 
-      // Make sure we don't duplicate processing
-      const existingOrder = await Order.findOne({ stripeSessionId: stripeSession.id });
-      if (existingOrder) {
-        return res.status(200).json({ received: true });
+        if (orderId && mongoose.Types.ObjectId.isValid(orderId)) {
+          const order = await processOrderPaid({
+            orderId,
+            stripeSessionId: stripeSession.id,
+            shipping: stripeSession.shipping_details || stripeSession.shipping,
+          });
+          if (!order) {
+            return res.status(200).json({ received: true, warning: 'Order not found' });
+          }
+        } else {
+          // Legacy webhook fallback
+          const compactCartItems = JSON.parse(metadata.cartItems || '[]');
+          const shippingAddress = JSON.parse(metadata.shippingAddress || '{}');
+
+          // Make sure we don't duplicate processing
+          const existingOrder = await Order.findOne({ stripeSessionId: stripeSession.id });
+          if (existingOrder) {
+            return res.status(200).json({ received: true });
+          }
+
+          await processOrderCreation({
+            userId,
+            compactCartItems,
+            shippingAddress,
+            stripeSessionId: stripeSession.id
+          });
+        }
+      } catch (error) {
+        console.error('❌ CRITICAL WEBHOOK DB ERROR (checkout.session.completed):', error.message, error);
       }
-
-      await processOrderCreation({
-        userId,
-        compactCartItems,
-        shippingAddress,
-        stripeSessionId: stripeSession.id
-      });
     }
 
     if (event.type === 'payment_intent.succeeded') {
       const paymentIntent = event.data.object;
       
-      // Handle custom PaymentIntent metadata
-      if (paymentIntent.metadata && paymentIntent.metadata.cartItems) {
-        const { userId, cartItems } = paymentIntent.metadata;
-        const compactCartItems = JSON.parse(cartItems || '[]');
+      try {
+        const metadata = paymentIntent.metadata || {};
+        const orderId = metadata.orderId;
 
-        const existingOrder = await Order.findOne({ stripeSessionId: paymentIntent.id });
-        if (existingOrder) {
-          return res.status(200).json({ received: true });
+        if (orderId && mongoose.Types.ObjectId.isValid(orderId)) {
+          const order = await processOrderPaid({
+            orderId,
+            stripeSessionId: paymentIntent.id,
+            shipping: paymentIntent.shipping,
+          });
+          if (!order) {
+            return res.status(200).json({ received: true, warning: 'Order not found' });
+          }
+        } else {
+          // Legacy webhook fallback if cartItems are still in metadata
+          if (metadata.cartItems) {
+            const { userId, cartItems } = metadata;
+            const compactCartItems = JSON.parse(cartItems || '[]');
+
+            const existingOrder = await Order.findOne({ stripeSessionId: paymentIntent.id });
+            if (existingOrder) {
+              return res.status(200).json({ received: true });
+            }
+
+            const shipping = paymentIntent.shipping || {};
+            const shippingAddress = {
+              fullName: shipping.name || 'Anonymous',
+              street: shipping.address?.line1 || '',
+              city: shipping.address?.city || '',
+              state: shipping.address?.state || '',
+              postalCode: shipping.address?.postal_code || '',
+              country: shipping.address?.country || 'US',
+            };
+
+            await processOrderCreation({
+              userId,
+              compactCartItems,
+              shippingAddress,
+              stripePaymentIntentId: paymentIntent.id
+            });
+          }
         }
-
-        const shipping = paymentIntent.shipping || {};
-        const shippingAddress = {
-          fullName: shipping.name || 'Anonymous',
-          street: shipping.address?.line1 || '',
-          city: shipping.address?.city || '',
-          state: shipping.address?.state || '',
-          postalCode: shipping.address?.postal_code || '',
-          country: shipping.address?.country || 'US',
-        };
-
-        await processOrderCreation({
-          userId,
-          compactCartItems,
-          shippingAddress,
-          stripePaymentIntentId: paymentIntent.id
-        });
+      } catch (error) {
+        console.error('❌ CRITICAL WEBHOOK DB ERROR (payment_intent.succeeded):', error.message, error);
       }
     }
 
     res.status(200).json({ received: true });
   } catch (err) {
+    console.error('❌ STRIPE WEBHOOK UNCAUGHT ERROR:', err.message, err);
     // Stripe will retry if we send a 500
     res.status(500).json({ error: 'Internal Server Error' });
   }
@@ -330,11 +501,86 @@ const stripeWebhook = async (req, res) => {
 // ── GET /api/payment/verify/:sessionId ────────────────────────────────────────
 const verifyPayment = asyncHandler(async (req, res, next) => {
   const { sessionId } = req.params;
-  const order = await Order.findOne({ stripeSessionId: sessionId }).populate(
+
+  // First, try to locate the order by stripeSessionId or by order _id itself
+  let order = await Order.findOne({
+    $or: [
+      { stripeSessionId: sessionId },
+      { _id: mongoose.Types.ObjectId.isValid(sessionId) ? sessionId : null }
+    ]
+  });
+
+  // If not found, retrieve the PaymentIntent/CheckoutSession from Stripe to find the orderId
+  if (!order) {
+    try {
+      if (sessionId.startsWith('pi_')) {
+        const paymentIntent = await stripe.paymentIntents.retrieve(sessionId);
+        const orderId = paymentIntent.metadata?.orderId;
+        if (orderId) {
+          order = await Order.findById(orderId);
+          // If Stripe confirms it succeeded, mark the pending order as paid on the fly
+          if (paymentIntent.status === 'succeeded' && order && order.paymentStatus === 'Pending') {
+            order = await processOrderPaid({
+              orderId,
+              stripeSessionId: paymentIntent.id,
+              shipping: paymentIntent.shipping,
+            });
+          }
+        }
+      } else if (sessionId.startsWith('cs_')) {
+        const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
+        const orderId = checkoutSession.metadata?.orderId;
+        if (orderId) {
+          order = await Order.findById(orderId);
+          if (checkoutSession.payment_status === 'paid' && order && order.paymentStatus === 'Pending') {
+            order = await processOrderPaid({
+              orderId,
+              stripeSessionId: checkoutSession.id,
+              shipping: checkoutSession.shipping_details || checkoutSession.shipping,
+            });
+          }
+        }
+      }
+    } catch (stripeErr) {
+      console.error('Stripe retrieval failed during payment verification:', stripeErr);
+    }
+  } else {
+    // If order was found but status is still Pending, let's verify with Stripe to be sure
+    if (order.paymentStatus === 'Pending') {
+      try {
+        if (sessionId.startsWith('pi_')) {
+          const paymentIntent = await stripe.paymentIntents.retrieve(sessionId);
+          if (paymentIntent.status === 'succeeded') {
+            order = await processOrderPaid({
+              orderId: order._id.toString(),
+              stripeSessionId: paymentIntent.id,
+              shipping: paymentIntent.shipping,
+            });
+          }
+        } else if (sessionId.startsWith('cs_')) {
+          const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
+          if (checkoutSession.payment_status === 'paid') {
+            order = await processOrderPaid({
+              orderId: order._id.toString(),
+              stripeSessionId: checkoutSession.id,
+              shipping: checkoutSession.shipping_details || checkoutSession.shipping,
+            });
+          }
+        }
+      } catch (stripeErr) {
+        console.error('Stripe check failed for pending order:', stripeErr);
+      }
+    }
+  }
+
+  if (!order) return next(new AppError('Order not found.', 404));
+
+  // Populate product details for the frontend success page view
+  order = await Order.findById(order._id).populate(
     'orderItems.product',
     'title images'
   );
-  if (!order) return next(new AppError('Order not found.', 404));
+
   res.status(200).json({ success: true, order });
 });
 
