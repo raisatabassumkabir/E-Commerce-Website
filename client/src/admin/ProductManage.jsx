@@ -236,6 +236,7 @@ const ProductManage = () => {
   const [existingImages,    setExistingImages]    = useState([]);
   const [saving,            setSaving]            = useState(false);
   const [deleting,          setDeleting]          = useState(null);
+  const [deleteModal,       setDeleteModal]       = useState({ isOpen: false, productId: null });
   const [filterLowStock,    setFilterLowStock]    = useState(false);
   const [searchQuery,       setSearchQuery]       = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -413,7 +414,6 @@ const ProductManage = () => {
   };
 
   const handleDelete = async (productId) => {
-    if (!window.confirm('Delete this product permanently? This cannot be undone.')) return;
     setDeleting(productId);
     try {
       await api.delete(`/products/${productId}`);
@@ -613,7 +613,7 @@ const ProductManage = () => {
                           </button>
                           <button
                             id={`delete-product-${product._id}`}
-                            onClick={() => handleDelete(product._id)}
+                            onClick={() => setDeleteModal({ isOpen: true, productId: product._id })}
                             disabled={deleting === product._id}
                             title="Delete product"
                             className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -1021,6 +1021,53 @@ const ProductManage = () => {
           </div>
         )}
       </Modal>
+
+      {deleteModal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          {/* Blurred Overlay */}
+          <div 
+            id="delete-confirm-overlay"
+            className="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setDeleteModal({ isOpen: false, productId: null })}
+          ></div>
+          
+          {/* Glassmorphism Modal Card */}
+          <div className="relative bg-white/90 backdrop-blur-md border border-white/20 p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4 transform transition-all animate-fade-in-up">
+            
+            {/* Warning Icon */}
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+              <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            
+            <h3 className="text-lg font-bold text-center text-neutral-900 mb-2">Delete Product?</h3>
+            <p className="text-sm text-center text-neutral-500 mb-6">
+              This action cannot be undone. This will permanently remove the product and its variants from your store.
+            </p>
+            
+            <div className="flex gap-3">
+              <button 
+                id="delete-cancel-btn"
+                onClick={() => setDeleteModal({ isOpen: false, productId: null })} 
+                className="flex-1 px-4 py-2 text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                id="delete-confirm-btn"
+                onClick={() => {
+                  handleDelete(deleteModal.productId);
+                  setDeleteModal({ isOpen: false, productId: null });
+                }} 
+                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl shadow-lg shadow-red-500/30 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
