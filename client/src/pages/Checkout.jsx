@@ -27,6 +27,32 @@ if (!stripePublicKey) {
   );
 }
 
+const COUNTRIES = [
+  'United States',
+  'United Kingdom',
+  'Canada',
+  'Australia',
+  'Germany',
+  'France',
+  'Italy',
+  'Spain',
+  'Japan',
+  'China',
+  'India',
+  'Brazil',
+  'South Africa',
+  'Mexico',
+  'Netherlands',
+  'Sweden',
+  'Switzerland',
+  'Norway',
+  'Denmark',
+  'New Zealand',
+  'Singapore',
+  'Ireland',
+  'Portugal',
+];
+
 const stripePromise = stripePublicKey ? loadStripe(stripePublicKey) : null;
 
 // ─── Helper Components ────────────────────────────────────────────────────────
@@ -114,7 +140,7 @@ const EmbeddedPaymentForm = ({
           city:       formData.city,
           state:      formData.state,
           postalCode: formData.zip,
-          country:    'US',
+          country:    formData.country || 'United States',
         },
         shippingPrice: shippingCost,
         paymentMethod,
@@ -134,7 +160,7 @@ const EmbeddedPaymentForm = ({
                 city: formData.city,
                 state: formData.state,
                 postal_code: formData.zip,
-                country: 'US',
+                country:    formData.country || 'United States',
               }
             },
             payment_method_data: {
@@ -300,6 +326,8 @@ const CheckoutPage = () => {
   const [shippingMethod, setShippingMethod] = useState('standard');
   const [clientSecret, setClientSecret]     = useState('');
   const [orderId, setOrderId]               = useState('');
+  const [countrySearch, setCountrySearch]   = useState('United States');
+  const [showCountries, setShowCountries]   = useState(false);
   const [formData, setFormData] = useState({
     fullName: user?.name || '',
     phone: '',
@@ -307,6 +335,7 @@ const CheckoutPage = () => {
     city: '',
     state: '',
     zip: '',
+    country: 'United States',
   });
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [isFormProcessing, setIsFormProcessing] = useState(false);
@@ -451,7 +480,7 @@ const CheckoutPage = () => {
                     placeholder="123 Fashion Ave, Suite 100" />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">City</label>
                     <input type="text" name="city" value={formData.city} onChange={handleChange}
@@ -466,12 +495,55 @@ const CheckoutPage = () => {
                       className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition disabled:opacity-60"
                       placeholder="NY" />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">ZIP</label>
                     <input type="text" name="zip" value={formData.zip} onChange={handleChange}
                       disabled={isFormProcessing}
                       className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition disabled:opacity-60"
                       placeholder="10001" />
+                  </div>
+
+                  <div className="relative">
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Country</label>
+                    <input
+                      type="text"
+                      value={countrySearch}
+                      onChange={(e) => {
+                        setCountrySearch(e.target.value);
+                        setFormData(prev => ({ ...prev, country: e.target.value }));
+                        setShowCountries(true);
+                      }}
+                      onFocus={() => setShowCountries(true)}
+                      onBlur={() => {
+                        setTimeout(() => setShowCountries(false), 200);
+                      }}
+                      disabled={isFormProcessing}
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition disabled:opacity-60 font-medium text-neutral-800"
+                      placeholder="Search country..."
+                    />
+                    {showCountries && (
+                      <ul className="absolute z-20 left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-xl shadow-lg max-h-48 overflow-y-auto custom-scrollbar">
+                        {COUNTRIES.filter(c => c.toLowerCase().includes(countrySearch.toLowerCase())).length > 0 ? (
+                          COUNTRIES.filter(c => c.toLowerCase().includes(countrySearch.toLowerCase())).map((c) => (
+                            <li
+                              key={c}
+                              onMouseDown={() => {
+                                setCountrySearch(c);
+                                setFormData(prev => ({ ...prev, country: c }));
+                              }}
+                              className="px-4 py-2 text-sm text-neutral-800 hover:bg-neutral-50 cursor-pointer font-medium transition-colors"
+                            >
+                              {c}
+                            </li>
+                          ))
+                        ) : (
+                          <li className="px-4 py-2.5 text-xs text-neutral-400 text-center font-medium">No countries found</li>
+                        )}
+                      </ul>
+                    )}
                   </div>
                 </div>
               </div>

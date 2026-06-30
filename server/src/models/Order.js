@@ -11,7 +11,7 @@ const orderItemSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   quantity: { type: Number, required: true, min: 1 },
   size: { type: String, default: 'N/A' },
-  color: { type: String, default: 'N/A' },
+  color: { type: String },
 });
 
 const shippingAddressSchema = new mongoose.Schema({

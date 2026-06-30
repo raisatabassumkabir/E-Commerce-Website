@@ -111,10 +111,24 @@ const ProductPage = () => {
       return;
     }
     setAddingToCart(true);
+
+    const activeUrl = (() => {
+      if (!selectedVariant) return product.images[0]?.url || '';
+      if (selectedVariant.image) return selectedVariant.image;
+      const colorKey = selectedVariant.color.toLowerCase().trim();
+      const match = (product.images || []).find(
+        (img) =>
+          (img.alt      && img.alt.toLowerCase().includes(colorKey)) ||
+          (img.url      && img.url.toLowerCase().includes(colorKey)) ||
+          (img.publicId && img.publicId.toLowerCase().includes(colorKey))
+      );
+      return match?.url || product.images[0]?.url || '';
+    })();
+
     addItem({
       product:  product._id,
       title:    product.title,
-      image:    selectedVariant?.image || product.images[0]?.url,
+      image:    activeUrl,
       price:    product.price,
       size:     selectedSize,
       color:    selectedVariant?.color || '',

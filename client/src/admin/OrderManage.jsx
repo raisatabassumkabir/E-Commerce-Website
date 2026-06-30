@@ -3,6 +3,7 @@ import { Search, Eye, X, Mail, Phone, Package, Truck, Info, ChevronLeft, Chevron
 import api from '../services/api';
 import Spinner from '../components/Spinner';
 import toast from 'react-hot-toast';
+import StatusBadge from '../components/StatusBadge';
 
 const ORDER_STATUSES = ['All', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
 const SORT_OPTIONS = [
@@ -213,9 +214,7 @@ const OrderManage = () => {
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${STATUS_COLORS[order.orderStatus] || STATUS_COLORS.Pending}`}>
-                        {order.orderStatus}
-                      </span>
+                      <StatusBadge status={order.orderStatus} />
                     </td>
                     <td className="p-4 font-semibold text-neutral-900">
                       ${order.totalPrice?.toFixed(2)}
@@ -306,9 +305,7 @@ const OrderManage = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold text-neutral-900">Order #{selectedOrder._id.slice(-8).toUpperCase()}</h2>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${STATUS_COLORS[selectedOrder.orderStatus] || STATUS_COLORS.Pending}`}>
-                    {selectedOrder.orderStatus}
-                  </span>
+                  <StatusBadge status={selectedOrder.orderStatus} />
                 </div>
                 <p className="text-xs text-neutral-500 mt-1">{new Date(selectedOrder.createdAt).toLocaleString()}</p>
               </div>

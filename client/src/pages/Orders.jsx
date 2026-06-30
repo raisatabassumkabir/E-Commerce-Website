@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Package, Clock, Truck, CheckCircle, XCircle, ArrowRight } from 'lucide-react';
 import api from '../services/api';
 import Spinner from '../components/Spinner';
+import StatusBadge from '../components/StatusBadge';
 
 const STATUS_ICONS = {
   Processing: <Clock size={14} className="text-yellow-400" />,
@@ -56,10 +57,7 @@ const Orders = () => {
                   <p className="text-neutral-600 text-sm">{new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`${STATUS_BADGE[order.deliveryStatus] || 'badge'} flex items-center gap-1.5`}>
-                    {STATUS_ICONS[order.deliveryStatus]}
-                    {order.deliveryStatus}
-                  </span>
+                  <StatusBadge status={order.orderStatus} />
                   <span className={`${order.paymentStatus === 'Paid' ? 'badge-green' : 'badge-yellow'}`}>
                     {order.paymentStatus}
                   </span>

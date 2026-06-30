@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import Spinner from '../components/Spinner';
+import StatusBadge from '../components/StatusBadge';
 
 const StatCard = ({ title, value, icon: Icon, trend, color, sub }) => (
   <div className="bg-white border border-neutral-200/60 shadow-subtle rounded-2xl p-6 flex items-start justify-between hover:shadow-elegant transition-shadow">
@@ -191,10 +192,7 @@ const Dashboard = () => {
                           </td>
                           <td className="px-5 py-4 text-neutral-900 font-semibold">${order.totalPrice?.toFixed(2)}</td>
                           <td className="px-5 py-4">
-                            <span className={`${cfg.badge || 'bg-neutral-100 text-neutral-600 border border-neutral-200'} px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 w-fit`}>
-                              {cfg.icon && <cfg.icon size={10} />}
-                              {order.orderStatus}
-                            </span>
+                            <StatusBadge status={order.orderStatus} />
                           </td>
                         </tr>
                       );
@@ -248,10 +246,7 @@ const Dashboard = () => {
                       const cfg = STATUS_CONFIG[item._id] || {};
                       return (
                         <div key={item._id} className="flex items-center justify-between mb-1">
-                          <span className={`${cfg.badge || 'bg-neutral-100 text-neutral-600 border border-neutral-200'} px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 text-xs`}>
-                            {cfg.icon && <cfg.icon size={10} />}
-                            {item._id}
-                          </span>
+                          <StatusBadge status={item._id} />
                           <span className="text-neutral-700 text-sm font-medium">{item.count}</span>
                         </div>
                       );
