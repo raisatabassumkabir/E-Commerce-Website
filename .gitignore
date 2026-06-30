@@ -35,3 +35,8 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Local uploads and test files
+server/uploads/
+test_image.png
+server/test_agg.js

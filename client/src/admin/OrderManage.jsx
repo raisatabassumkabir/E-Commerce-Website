@@ -13,14 +13,6 @@ const SORT_OPTIONS = [
   { value: 'lowest_total', label: 'Lowest Total' },
 ];
 
-const STATUS_COLORS = {
-  Pending: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/20',
-  Processing: 'bg-blue-500/10 text-blue-700 border-blue-500/20',
-  Shipped: 'bg-purple-500/10 text-purple-700 border-purple-500/20',
-  Delivered: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
-  Cancelled: 'bg-red-500/10 text-red-700 border-red-500/20',
-};
-
 const OrderManage = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);

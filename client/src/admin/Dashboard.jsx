@@ -22,16 +22,6 @@ const StatCard = ({ title, value, icon: Icon, trend, color, sub }) => (
   </div>
 );
 
-const STATUS_CONFIG = {
-  Pending: { badge: 'bg-amber-100/50 text-amber-700 border border-amber-200', icon: Clock },
-  Processing: { badge: 'bg-amber-100/50 text-amber-700 border border-amber-200', icon: Clock },
-  Shipped: { badge: 'bg-blue-100/50 text-blue-700 border border-blue-200', icon: Truck },
-  'Out for Delivery': { badge: 'bg-blue-100/50 text-blue-700 border border-blue-200', icon: Truck },
-  Delivered: { badge: 'bg-emerald-100/50 text-emerald-700 border border-emerald-200', icon: CheckCircle },
-  Paid: { badge: 'bg-emerald-100/50 text-emerald-700 border border-emerald-200', icon: CheckCircle },
-  Cancelled: { badge: 'bg-red-100/50 text-red-700 border border-red-200', icon: XCircle },
-};
-
 const Dashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -173,7 +163,6 @@ const Dashboard = () => {
                     </tr>
                   ) : (
                     recentOrders.map((order) => {
-                      const cfg = STATUS_CONFIG[order.orderStatus] || {};
                       return (
                         <tr key={order._id} className="border-b border-neutral-100 hover:bg-neutral-50 transition-colors">
                           <td className="px-5 py-4 font-mono text-xs text-neutral-500">
@@ -243,7 +232,6 @@ const Dashboard = () => {
                   {/* Legends */}
                   <div className="space-y-3">
                     {statusBreakdown.map((item) => {
-                      const cfg = STATUS_CONFIG[item._id] || {};
                       return (
                         <div key={item._id} className="flex items-center justify-between mb-1">
                           <StatusBadge status={item._id} />

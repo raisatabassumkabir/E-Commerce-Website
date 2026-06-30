@@ -5,22 +5,6 @@ import api from '../services/api';
 import Spinner from '../components/Spinner';
 import StatusBadge from '../components/StatusBadge';
 
-const STATUS_ICONS = {
-  Processing: <Clock size={14} className="text-yellow-400" />,
-  Shipped: <Truck size={14} className="text-blue-400" />,
-  'Out for Delivery': <Truck size={14} className="text-indigo-400" />,
-  Delivered: <CheckCircle size={14} className="text-emerald-400" />,
-  Cancelled: <XCircle size={14} className="text-red-400" />,
-};
-
-const STATUS_BADGE = {
-  Processing: 'badge-yellow',
-  Shipped: 'badge-blue',
-  'Out for Delivery': 'badge-blue',
-  Delivered: 'badge-green',
-  Cancelled: 'badge-red',
-};
-
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);

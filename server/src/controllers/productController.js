@@ -12,7 +12,13 @@ const buildProductQuery = (queryParams) => {
 
   const query = { isPublished: true };
 
-  if (keyword)     query.$text = { $search: keyword };
+  if (keyword) {
+    query.$or = [
+      { title: { $regex: keyword, $options: 'i' } },
+      { description: { $regex: keyword, $options: 'i' } },
+      { tags: { $regex: keyword, $options: 'i' } },
+    ];
+  }
   if (category)    query.category    = { $in: Array.isArray(category)    ? category    : [category] };
   if (subcategory) query.subcategory = { $in: Array.isArray(subcategory) ? subcategory : [subcategory] };
   // Variant-aware size & colour filters
@@ -82,7 +88,13 @@ const getAdminProducts = asyncHandler(async (req, res) => {
   const { sort = 'newest', page = 1, limit = 50, keyword, category, lowStock } = req.query;
 
   const query = {};
-  if (keyword)  query.$text    = { $search: keyword };
+  if (keyword) {
+    query.$or = [
+      { title: { $regex: keyword, $options: 'i' } },
+      { description: { $regex: keyword, $options: 'i' } },
+      { tags: { $regex: keyword, $options: 'i' } },
+    ];
+  }
   if (category) query.category = category;
   // Low-stock: any variant/size with ≤5 units, or products with no variants
   if (lowStock === 'true') {
@@ -126,6 +138,30 @@ const createProduct = asyncHandler(async (req, res, next) => {
   delete body.colors;
   delete body.inventoryCount;
 
+  // Resolve temporary variant image pointers to final uploaded URLs
+  if (body.variants && Array.isArray(body.variants)) {
+    body.variants = body.variants.map((v) => {
+      if (v.image) {
+        if (v.image.startsWith('index:')) {
+          const fileIdx = parseInt(v.image.split(':')[1], 10);
+          if (req.files && req.files[fileIdx]) {
+            const f = req.files[fileIdx];
+            const isLocal = !f.path.startsWith('http');
+            const url = isLocal
+              ? `${req.protocol}://${req.get('host')}/uploads/${f.filename}`
+              : f.path;
+            return { ...v, image: url };
+          }
+          return { ...v, image: '' };
+        }
+        if (v.image.startsWith('blob:')) {
+          return { ...v, image: '' };
+        }
+      }
+      return v;
+    });
+  }
+
   const images = req.files
     ? req.files.map((f) => {
         const isLocal = !f.path.startsWith('http');
@@ -158,6 +194,30 @@ const updateProduct = asyncHandler(async (req, res, next) => {
   delete body.sizes;
   delete body.colors;
   delete body.inventoryCount;
+
+  // Resolve temporary variant image pointers to final uploaded URLs
+  if (body.variants && Array.isArray(body.variants)) {
+    body.variants = body.variants.map((v) => {
+      if (v.image) {
+        if (v.image.startsWith('index:')) {
+          const fileIdx = parseInt(v.image.split(':')[1], 10);
+          if (req.files && req.files[fileIdx]) {
+            const f = req.files[fileIdx];
+            const isLocal = !f.path.startsWith('http');
+            const url = isLocal
+              ? `${req.protocol}://${req.get('host')}/uploads/${f.filename}`
+              : f.path;
+            return { ...v, image: url };
+          }
+          return { ...v, image: '' };
+        }
+        if (v.image.startsWith('blob:')) {
+          return { ...v, image: '' };
+        }
+      }
+      return v;
+    });
+  }
 
   // Existing images list from frontend
   let baseImages = product.images;

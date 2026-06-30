@@ -70,7 +70,7 @@ const StockBadge = ({ variants }) => {
 };
 
 // ── VariantRow: one colour accordion ─────────────────────────────────────────
-const VariantRow = ({ variant, index, category, onChange, onRemove }) => {
+const VariantRow = ({ variant, index, category, onChange, onRemove, galleryImages = [] }) => {
   const [open, setOpen] = useState(true);
   const sizes = category === 'Footwear' ? FOOTWEAR_SIZES : ALL_SIZES;
 
@@ -142,18 +142,33 @@ const VariantRow = ({ variant, index, category, onChange, onRemove }) => {
 
       {open && (
         <div className="px-4 py-4 space-y-4">
-          {/* Optional per-variant image URL */}
+          {/* Link image from gallery */}
           <div>
-            <label className="text-neutral-600 text-xs font-medium mb-1 block">
-              Variant Image URL <span className="text-neutral-400">(optional — overrides gallery for this colour)</span>
+            <label className="text-neutral-600 text-xs font-medium mb-2 block">
+              Link image from gallery (Select one)
             </label>
-            <input
-              type="url"
-              value={variant.image || ''}
-              onChange={(e) => onChange(index, { ...variant, image: e.target.value })}
-              placeholder="https://..."
-              className="input text-sm py-1.5"
-            />
+            {galleryImages.length === 0 ? (
+              <p className="text-xs text-amber-500 font-medium">Upload images to the main gallery first.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {galleryImages.map((img, imgIndex) => {
+                  const isSelected = variant.image === img.id;
+                  return (
+                    <img
+                      key={imgIndex}
+                      src={img.url}
+                      alt="Gallery thumbnail"
+                      onClick={() => onChange(index, { ...variant, image: isSelected ? '' : img.id })}
+                      className={`w-12 h-12 object-cover rounded cursor-pointer transition-all ${
+                        isSelected
+                          ? 'ring-2 ring-neutral-900 scale-105 opacity-100'
+                          : 'opacity-60 hover:opacity-100 border border-neutral-200'
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Size selector */}
@@ -223,15 +238,22 @@ const ProductManage = () => {
   const [deleting,          setDeleting]          = useState(null);
   const [filterLowStock,    setFilterLowStock]    = useState(false);
   const [searchQuery,       setSearchQuery]       = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   // Restock editing state (full variants copy)
   const [restockVariants,   setRestockVariants]   = useState([]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ limit: 100 });
-      if (filterLowStock) params.set('lowStock', 'true');
-      if (searchQuery)    params.set('keyword', searchQuery);
+      if (debouncedSearchQuery) params.set('keyword', debouncedSearchQuery);
       const { data } = await api.get(`/products/admin/all?${params.toString()}`);
       setProducts(data.products);
     } catch {
@@ -239,7 +261,7 @@ const ProductManage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filterLowStock, searchQuery]);
+  }, [debouncedSearchQuery]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
@@ -324,10 +346,23 @@ const ProductManage = () => {
 
     setSaving(true);
     try {
+      // Map temporary frontend UIDs to index pointers before sending to backend
+      const mappedVariants = form.variants.map((v) => {
+        if (v.image && v.image.startsWith('uid-')) {
+          const fileIdx = images.findIndex((img) => img.uid === v.image);
+          if (fileIdx !== -1) {
+            return { ...v, image: `index:${fileIdx}` };
+          } else {
+            return { ...v, image: '' };
+          }
+        }
+        return v;
+      });
+
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => {
         if (k === 'variants') {
-          fd.append(k, JSON.stringify(v));
+          fd.append(k, JSON.stringify(mappedVariants));
         } else if (k === 'tags') {
           fd.append(k, JSON.stringify(v.split(',').map((t) => t.trim()).filter(Boolean)));
         } else {
@@ -393,6 +428,13 @@ const ProductManage = () => {
 
   const lowStockCount = products.filter((p) => totalStock(p.variants) <= 10 && totalStock(p.variants) > 0).length;
   const outOfStockCount = products.filter((p) => totalStock(p.variants) === 0).length;
+
+  const displayedProducts = products.filter((p) => {
+    if (filterLowStock) {
+      return totalStock(p.variants) <= 10;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -469,14 +511,14 @@ const ProductManage = () => {
                 </tr>
               </thead>
               <tbody>
-                {products.length === 0 ? (
+                {displayedProducts.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center p-12 text-neutral-400">
                       No products found
                     </td>
                   </tr>
                 ) : (
-                  products.map((product) => (
+                  displayedProducts.map((product) => (
                     <tr
                       key={product._id}
                       id={`product-row-${product._id}`}
@@ -774,7 +816,10 @@ const ProductManage = () => {
               multiple
               className="hidden"
               onChange={(e) => {
-                const selectedFiles = Array.from(e.target.files);
+                const selectedFiles = Array.from(e.target.files).map((file) => {
+                  file.uid = `uid-${Date.now()}-${Math.random()}`;
+                  return file;
+                });
                 const limit = 6 - (existingImages.length + images.length);
                 setImages((prev) => [...prev, ...selectedFiles.slice(0, limit)]);
               }}
@@ -826,6 +871,10 @@ const ProductManage = () => {
                     category={form.category}
                     onChange={handleVariantChange}
                     onRemove={handleVariantRemove}
+                    galleryImages={[
+                      ...existingImages.map((img) => ({ url: img.url, id: img.url })),
+                      ...images.map((file) => ({ url: URL.createObjectURL(file), id: file.uid }))
+                    ]}
                   />
                 ))}
               </div>

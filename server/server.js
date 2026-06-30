@@ -12,6 +12,7 @@ const orderRoutes = require('./src/routes/orderRoutes');
 const paymentRoutes = require('./src/routes/paymentRoutes');
 const reviewRoutes = require('./src/routes/reviewRoutes');
 const userRoutes = require('./src/routes/userRoutes');
+const settingsRoutes = require('./src/routes/settingsRoutes');
 
 // Connect to MongoDB
 connectDB();
@@ -70,6 +71,22 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/settings', settingsRoutes);
+
+// ── Upload endpoint for product variant images ─────────────────────────────────
+const { protect, adminOnly } = require('./src/middleware/authMiddleware');
+const { uploadProductImages } = require('./src/middleware/uploadMiddleware');
+
+app.post('/api/upload', protect, adminOnly, uploadProductImages.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No file uploaded' });
+  }
+  const isLocal = !req.file.path.startsWith('http');
+  const url = isLocal
+    ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`
+    : req.file.path;
+  res.status(200).json({ success: true, image: url, imageUrl: url });
+});
 
 // ── Error handling ─────────────────────────────────────────────────────────────
 app.use(notFound);

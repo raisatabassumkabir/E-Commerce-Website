@@ -1,0 +1,65 @@
+const StoreSettings = require('../models/StoreSettings');
+const asyncHandler = require('../utils/asyncHandler');
+const AppError = require('../utils/AppError');
+
+// Helper to resolve local/Cloudinary URL
+const getFileUrl = (req, file) => {
+  if (!file) return '';
+  const isLocal = !file.path.startsWith('http');
+  return isLocal
+    ? `${req.protocol}://${req.get('host')}/uploads/${file.filename}`
+    : file.path;
+};
+
+// ── GET /api/settings ─────────────────────────────────────────────────────────
+exports.getSettings = asyncHandler(async (req, res) => {
+  let settings = await StoreSettings.findOne();
+  if (!settings) {
+    settings = await StoreSettings.create({});
+  }
+  res.status(200).json({ success: true, settings });
+});
+
+// ── PUT /api/settings ─────────────────────────────────────────────────────────
+exports.updateSettings = asyncHandler(async (req, res) => {
+  let settings = await StoreSettings.findOne();
+  if (!settings) {
+    settings = await StoreSettings.create({});
+  }
+
+  const { storeName, maintenanceMode } = req.body;
+
+  if (storeName !== undefined) settings.storeName = storeName;
+  if (maintenanceMode !== undefined) settings.maintenanceMode = maintenanceMode === 'true';
+
+  // Process hero images
+  let heroImages = [];
+  if (req.body.existingHeroImages) {
+    try {
+      heroImages = JSON.parse(req.body.existingHeroImages);
+    } catch (e) {
+      heroImages = Array.isArray(req.body.existingHeroImages) ? req.body.existingHeroImages : [req.body.existingHeroImages];
+    }
+  }
+  if (req.files && req.files.heroImages) {
+    const newHeroUrls = req.files.heroImages.map(file => getFileUrl(req, file));
+    heroImages = [...heroImages, ...newHeroUrls];
+  }
+  settings.heroImages = heroImages;
+
+  // Process category images
+  const categories = ['men', 'women', 'accessories', 'footwear', 'kids', 'sale'];
+  categories.forEach(cat => {
+    const fileFieldName = `${cat}Image`;
+    const bodyFieldName = `existing${cat.charAt(0).toUpperCase() + cat.slice(1)}Image`;
+    
+    if (req.files && req.files[fileFieldName]) {
+      settings.categoryImages[cat] = getFileUrl(req, req.files[fileFieldName][0]);
+    } else if (req.body[bodyFieldName] !== undefined) {
+      settings.categoryImages[cat] = req.body[bodyFieldName];
+    }
+  });
+
+  const updated = await settings.save();
+  res.status(200).json({ success: true, settings: updated });
+});

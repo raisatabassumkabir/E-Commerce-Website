@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Menu, X,
-  LogOut, ChevronRight, Sparkles,
+  LogOut, ChevronRight, Sparkles, Settings as SettingsIcon,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -11,6 +11,7 @@ const navItems = [
   { label: 'Products', icon: Package, to: '/admin/products' },
   { label: 'Orders', icon: ShoppingCart, to: '/admin/orders' },
   { label: 'Users', icon: Users, to: '/admin/users' },
+  { label: 'Settings', icon: SettingsIcon, to: '/admin/settings' },
 ];
 
 const AdminLayout = () => {

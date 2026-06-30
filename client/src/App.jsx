@@ -26,6 +26,7 @@ import Dashboard from './admin/Dashboard';
 import ProductManage from './admin/ProductManage';
 import OrderManage from './admin/OrderManage';
 import UserManage from './admin/UserManage';
+import Settings from './admin/Settings';
 
 const App = () => {
   const fetchCurrentUser = useAuthStore((s) => s.fetchCurrentUser);
@@ -77,6 +78,7 @@ const App = () => {
           <Route path="products" element={<ProductManage />} />
           <Route path="orders" element={<OrderManage />} />
           <Route path="users" element={<UserManage />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
 
         {/* ── Error pages ──────────────────────────────────────────────────── */}

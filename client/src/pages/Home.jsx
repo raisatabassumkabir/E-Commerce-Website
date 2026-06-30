@@ -5,14 +5,14 @@ import api from '../services/api';
 import ProductCard from '../components/ProductCard';
 import Spinner from '../components/Spinner';
 
-const CATEGORIES = [
-  { name: 'Men', img: 'https://images.unsplash.com/photo-1490578474895-699cd4e2cf59?w=600' },
-  { name: 'Women', img: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=600' },
-  { name: 'Kids', img: 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=600' },
-  { name: 'Accessories', img: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=600' },
-  { name: 'Footwear', img: 'https://images.unsplash.com/photo-1463100099107-aa0980c362e6?w=600' },
-  { name: 'Sale', img: 'https://images.unsplash.com/photo-1523381294911-8d3cead13475?w=600' },
-];
+const DEFAULT_CATEGORY_IMAGES = {
+  men: 'https://images.unsplash.com/photo-1490578474895-699cd4e2cf59?w=600',
+  women: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=600',
+  kids: 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=600',
+  accessories: 'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=600',
+  footwear: 'https://images.unsplash.com/photo-1463100099107-aa0980c362e6?w=600',
+  sale: 'https://images.unsplash.com/photo-1523381294911-8d3cead13475?w=600',
+};
 
 const FEATURES = [
   { icon: Truck, title: 'Complimentary Shipping', desc: 'On orders above $100' },
@@ -23,21 +23,37 @@ const FEATURES = [
 const Home = () => {
   const [featured, setFeatured] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchFeatured = async () => {
+    const fetchFeaturedAndSettings = async () => {
       try {
-        const { data } = await api.get('/products?featured=true&limit=8');
-        setFeatured(data.products);
+        const [{ data: prodData }, { data: settingsData }] = await Promise.all([
+          api.get('/products?featured=true&limit=8'),
+          api.get('/settings'),
+        ]);
+        setFeatured(prodData.products);
+        if (settingsData.success) {
+          setSettings(settingsData.settings);
+        }
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    fetchFeatured();
+    fetchFeaturedAndSettings();
   }, []);
+
+  const categoriesList = [
+    { name: 'Men', img: settings?.categoryImages?.men || DEFAULT_CATEGORY_IMAGES.men },
+    { name: 'Women', img: settings?.categoryImages?.women || DEFAULT_CATEGORY_IMAGES.women },
+    { name: 'Kids', img: settings?.categoryImages?.kids || DEFAULT_CATEGORY_IMAGES.kids },
+    { name: 'Accessories', img: settings?.categoryImages?.accessories || DEFAULT_CATEGORY_IMAGES.accessories },
+    { name: 'Footwear', img: settings?.categoryImages?.footwear || DEFAULT_CATEGORY_IMAGES.footwear },
+    { name: 'Sale', img: settings?.categoryImages?.sale || DEFAULT_CATEGORY_IMAGES.sale },
+  ];
 
   return (
     <div className="animate-fade-in bg-nude-50">
@@ -90,13 +106,13 @@ const Home = () => {
           {/* Right — Clean editorial layout */}
           <div className="relative hidden lg:block h-[700px]">
             <div className="absolute top-0 right-0 w-72 h-[450px] overflow-hidden shadow-elegant bg-nude-100 border border-line p-2">
-              <img src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600" alt="Featured" className="w-full h-full object-cover grayscale-[20%]" />
+              <img src={settings?.heroImages?.[0] || "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600"} alt="Featured" className="w-full h-full object-cover grayscale-[20%]" />
             </div>
             <div className="absolute bottom-0 left-0 w-64 h-[400px] overflow-hidden shadow-elegant bg-white border border-line p-2 z-10">
-              <img src="https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=600" alt="Featured" className="w-full h-full object-cover grayscale-[20%]" />
+              <img src={settings?.heroImages?.[1] || "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=600"} alt="Featured" className="w-full h-full object-cover grayscale-[20%]" />
             </div>
             <div className="absolute top-1/2 left-1/3 -translate-y-1/2 w-48 h-64 overflow-hidden shadow-elegant border border-line p-1 bg-white z-20">
-              <img src="https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400" alt="Featured" className="w-full h-full object-cover grayscale-[10%]" />
+              <img src={settings?.heroImages?.[2] || "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400"} alt="Featured" className="w-full h-full object-cover grayscale-[10%]" />
             </div>
           </div>
         </div>
@@ -111,7 +127,7 @@ const Home = () => {
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6 md:gap-8">
-          {CATEGORIES.map((cat) => (
+          {categoriesList.map((cat) => (
             <Link
               key={cat.name}
               to={`/shop?category=${cat.name}`}
