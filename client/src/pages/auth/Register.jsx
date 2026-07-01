@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, Sparkles, Check } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import toast from 'react-hot-toast';
+import Logo from '../../components/Logo';
 
 const BENEFITS = ['Free shipping on orders $100+', 'Exclusive member discounts', 'Early access to new collections'];
 
@@ -37,10 +38,8 @@ const Register = () => {
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#FDFBF9] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-100 via-[#FDFBF9] to-[#FDFBF9] relative overflow-hidden">
       <div className="w-full max-w-md relative z-10 animate-slide-up">
         <div className="text-center mb-10">
-          <Link to="/" className="inline-flex items-center gap-2 group mb-6">
-            <div className="w-10 h-10 rounded-xl bg-gradient-brand flex items-center justify-center group-hover:shadow-brand transition-shadow">
-              <Sparkles size={18} className="text-white" />
-            </div>
+          <Link to="/" className="inline-flex items-center gap-2 md:gap-3 group mb-6">
+            <Logo className="w-10 h-10 transition-transform duration-500 group-hover:scale-105" />
             <span className="font-display font-bold text-2xl gradient-text">ThreadHaus</span>
           </Link>
           <h1 className="text-3xl font-bold text-neutral-900 tracking-tight mb-2">Create your account</h1>

@@ -7,6 +7,7 @@ import {
   LogOut, ChevronRight, Sparkles, Settings as SettingsIcon,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
+import Logo from '../components/Logo';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, to: '/admin' },
@@ -71,10 +72,8 @@ const AdminLayout = () => {
         {/* Logo */}
         <div className={`flex items-center h-16 px-4 border-b border-neutral-200/80 ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
           {sidebarOpen && (
-            <Link to="/" className="flex items-center gap-2 group">
-              <div className="w-7 h-7 rounded-lg bg-gradient-brand flex items-center justify-center">
-                <Sparkles size={14} className="text-white" />
-              </div>
+            <Link to="/" className="flex items-center gap-2 md:gap-3 group">
+              <Logo className="w-7 h-7" />
               <span className="font-display font-bold text-base gradient-text">ThreadHaus</span>
             </Link>
           )}

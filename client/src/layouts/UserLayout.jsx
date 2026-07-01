@@ -5,6 +5,7 @@ import { Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCartStore } from '../store/useCartStore';
 import CartDrawer from '../components/CartDrawer';
+import Logo from '../components/Logo';
 
 const UserLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -46,7 +47,8 @@ const UserLayout = () => {
         <div className="container-page">
           <nav className="flex items-center justify-between h-16 md:h-20">
             {/* Logo */}
-            <Link id="nav-logo" to="/" className="flex items-center gap-2 group">
+            <Link id="nav-logo" to="/" className="flex items-center gap-2 md:gap-3 group">
+              <Logo className="w-6 h-6 md:w-7 md:h-7 transition-transform duration-500 group-hover:scale-105" />
               <span className="font-display font-medium text-xl text-brand-900 tracking-tight">
                 THREADHAUS
               </span>
@@ -209,9 +211,12 @@ const UserLayout = () => {
         <div className="container-page py-16">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="col-span-1 md:col-span-2">
-              <span className="font-display font-medium text-xl text-brand-900 tracking-tight block mb-4">
-                THREADHAUS
-              </span>
+              <div className="flex items-center gap-2 md:gap-3 mb-4">
+                <Logo className="w-8 h-8 md:w-10 md:h-10" />
+                <span className="font-display font-medium text-xl text-brand-900 tracking-tight block">
+                  THREADHAUS
+                </span>
+              </div>
               <p className="text-brand-900/60 text-sm leading-relaxed max-w-xs">
                 Premium clothing for every occasion. Curated collections, sustainable materials, timeless style.
               </p>
