@@ -385,6 +385,24 @@ const createCheckoutSession = asyncHandler(async (req, res, next) => {
 });
 
 // ── POST /api/webhook/stripe ──────────────────────────────────────────────────
+const emitNewOrderEvent = async (req, order) => {
+  try {
+    const io = req.app.get('io');
+    if (io && order) {
+      const populatedOrder = await Order.findById(order._id).populate('user', 'name');
+      if (populatedOrder) {
+        io.to('admin-alerts').emit('new-order', {
+          title: 'New Order Received!',
+          message: `${populatedOrder.user?.name || 'A customer'} just placed an order for $${populatedOrder.totalPrice}`,
+          orderId: populatedOrder._id
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Socket emit error:', err);
+  }
+};
+
 const stripeWebhook = async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
@@ -417,6 +435,7 @@ const stripeWebhook = async (req, res) => {
           if (!order) {
             return res.status(200).json({ received: true, warning: 'Order not found' });
           }
+          await emitNewOrderEvent(req, order);
         } else {
           // Legacy webhook fallback
           const compactCartItems = JSON.parse(metadata.cartItems || '[]');
@@ -428,12 +447,13 @@ const stripeWebhook = async (req, res) => {
             return res.status(200).json({ received: true });
           }
 
-          await processOrderCreation({
+          const createdOrder = await processOrderCreation({
             userId,
             compactCartItems,
             shippingAddress,
             stripeSessionId: stripeSession.id
           });
+          await emitNewOrderEvent(req, createdOrder);
         }
       } catch (error) {
         console.error('❌ CRITICAL WEBHOOK DB ERROR (checkout.session.completed):', error.message, error);
@@ -456,6 +476,7 @@ const stripeWebhook = async (req, res) => {
           if (!order) {
             return res.status(200).json({ received: true, warning: 'Order not found' });
           }
+          await emitNewOrderEvent(req, order);
         } else {
           // Legacy webhook fallback if cartItems are still in metadata
           if (metadata.cartItems) {
@@ -477,17 +498,20 @@ const stripeWebhook = async (req, res) => {
               country: shipping.address?.country || 'US',
             };
 
-            await processOrderCreation({
+            const createdOrder = await processOrderCreation({
               userId,
               compactCartItems,
               shippingAddress,
               stripePaymentIntentId: paymentIntent.id
             });
+            await emitNewOrderEvent(req, createdOrder);
           }
         }
       } catch (error) {
         console.error('❌ CRITICAL WEBHOOK DB ERROR (payment_intent.succeeded):', error.message, error);
       }
+    } else {
+      console.log(`Unhandled event type: ${event.type}`);
     }
 
     res.status(200).json({ received: true });

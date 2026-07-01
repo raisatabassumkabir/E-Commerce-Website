@@ -32,20 +32,23 @@ exports.updateSettings = asyncHandler(async (req, res) => {
   if (storeName !== undefined) settings.storeName = storeName;
   if (maintenanceMode !== undefined) settings.maintenanceMode = maintenanceMode === 'true';
 
-  // Process hero images
-  let heroImages = [];
-  if (req.body.existingHeroImages) {
-    try {
-      heroImages = JSON.parse(req.body.existingHeroImages);
-    } catch (e) {
-      heroImages = Array.isArray(req.body.existingHeroImages) ? req.body.existingHeroImages : [req.body.existingHeroImages];
+  // Process hero subtitle
+  if (req.body.heroSubtitle !== undefined) {
+    settings.heroSubtitle = req.body.heroSubtitle;
+  }
+
+  // Process hero image slots
+  const heroSlots = ['heroImageMain', 'heroImageTopRight', 'heroImageBottomLeft'];
+  heroSlots.forEach(slot => {
+    const fileFieldName = slot;
+    const bodyFieldName = `existing${slot.charAt(0).toUpperCase() + slot.slice(1)}`;
+    
+    if (req.files && req.files[fileFieldName]) {
+      settings[slot] = getFileUrl(req, req.files[fileFieldName][0]);
+    } else if (req.body[bodyFieldName] !== undefined) {
+      settings[slot] = req.body[bodyFieldName];
     }
-  }
-  if (req.files && req.files.heroImages) {
-    const newHeroUrls = req.files.heroImages.map(file => getFileUrl(req, file));
-    heroImages = [...heroImages, ...newHeroUrls];
-  }
-  settings.heroImages = heroImages;
+  });
 
   // Process category images
   const categories = ['men', 'women', 'accessories', 'footwear', 'kids', 'sale'];

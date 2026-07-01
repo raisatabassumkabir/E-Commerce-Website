@@ -3,7 +3,10 @@ const mongoose = require('mongoose');
 const storeSettingsSchema = new mongoose.Schema(
   {
     storeName: { type: String, default: 'ThreadHaus' },
-    heroImages: { type: [String], default: [] },
+    heroSubtitle: { type: String, default: 'NEW SS 2026 COLLECTION' },
+    heroImageMain: { type: String },
+    heroImageTopRight: { type: String },
+    heroImageBottomLeft: { type: String },
     categoryImages: {
       men: { type: String, default: '' },
       women: { type: String, default: '' },

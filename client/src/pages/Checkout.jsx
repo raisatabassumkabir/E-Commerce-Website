@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronRight, CreditCard, Tag } from 'lucide-react';
+import { ChevronRight, CreditCard, Tag, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { loadStripe } from '@stripe/stripe-js';
@@ -13,6 +13,18 @@ import {
   useElements,
 } from '@stripe/react-stripe-js';
 import TestHelper from '../components/TestHelper';
+
+const getIsoCode = (countryName) => {
+  if (!countryName) return 'US';
+  const map = {
+    "United States": "US",
+    "United Kingdom": "GB",
+    "Canada": "CA",
+    "Australia": "AU",
+    "Bangladesh": "BD"
+  };
+  return map[countryName.trim()] || 'US'; 
+};
 
 // ─── Stripe Init (safe guard) ────────────────────────────────────────────────
 const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
@@ -28,29 +40,46 @@ if (!stripePublicKey) {
 }
 
 const COUNTRIES = [
-  'United States',
-  'United Kingdom',
-  'Canada',
+  'Argentina',
   'Australia',
-  'Germany',
-  'France',
-  'Italy',
-  'Spain',
-  'Japan',
-  'China',
-  'India',
+  'Bangladesh',
   'Brazil',
-  'South Africa',
+  'Canada',
+  'Chile',
+  'China',
+  'Colombia',
+  'Denmark',
+  'Egypt',
+  'France',
+  'Germany',
+  'India',
+  'Indonesia',
+  'Ireland',
+  'Italy',
+  'Japan',
+  'Kenya',
+  'Malaysia',
   'Mexico',
   'Netherlands',
+  'New Zealand',
+  'Nigeria',
+  'Norway',
+  'Pakistan',
+  'Philippines',
+  'Portugal',
+  'Saudi Arabia',
+  'Singapore',
+  'South Africa',
+  'South Korea',
+  'Spain',
   'Sweden',
   'Switzerland',
-  'Norway',
-  'Denmark',
-  'New Zealand',
-  'Singapore',
-  'Ireland',
-  'Portugal',
+  'Thailand',
+  'Turkey',
+  'United Arab Emirates',
+  'United Kingdom',
+  'United States',
+  'Vietnam',
 ];
 
 const stripePromise = stripePublicKey ? loadStripe(stripePublicKey) : null;
@@ -160,18 +189,18 @@ const EmbeddedPaymentForm = ({
                 city: formData.city,
                 state: formData.state,
                 postal_code: formData.zip,
-                country:    formData.country || 'United States',
               }
             },
             payment_method_data: {
               billing_details: {
-                name:  formData.fullName,
+                name:  formData.fullName || 'Guest',
                 phone: formData.phone,
                 address: {
-                  city:        formData.city,
-                  state:       formData.state,
-                  postal_code: formData.zip,
-                  line1:       formData.address,
+                  line1:       formData.address || '',
+                  city:        formData.city || '',
+                  state:       formData.state || '',
+                  postal_code: formData.zip || '',
+                  country:     getIsoCode(formData.country),
                 },
               },
             },
@@ -264,7 +293,7 @@ const EmbeddedPaymentForm = ({
 
           {paymentMethod === 'card' && (
             <div className="mt-4 pt-3 border-t border-neutral-100">
-              <PaymentElement options={{ layout: 'tabs' }} />
+              <PaymentElement options={{ layout: 'tabs', fields: { billingDetails: { address: 'never' } } }} />
             </div>
           )}
         </div>
@@ -345,10 +374,27 @@ const CheckoutPage = () => {
   const tax         = Number((subtotal * 0.08).toFixed(2));
   const finalTotal  = subtotal + shippingCost + tax;
 
+  const filteredCountries = useMemo(() => {
+    return COUNTRIES.filter(c => c.trim().toLowerCase().includes(countrySearch.trim().toLowerCase()));
+  }, [countrySearch]);
+
   const handleChange = (e) =>
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
   const hasInitialized = useRef(false);
+  const countryDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target)) {
+        setShowCountries(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Pull Client Secret exactly ONCE on mount
   useEffect(() => {
@@ -506,41 +552,46 @@ const CheckoutPage = () => {
                       placeholder="10001" />
                   </div>
 
-                  <div className="relative">
+                  <div className="relative w-full" ref={countryDropdownRef}>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">Country</label>
-                    <input
-                      type="text"
-                      value={countrySearch}
-                      onChange={(e) => {
-                        setCountrySearch(e.target.value);
-                        setFormData(prev => ({ ...prev, country: e.target.value }));
-                        setShowCountries(true);
-                      }}
-                      onFocus={() => setShowCountries(true)}
-                      onBlur={() => {
-                        setTimeout(() => setShowCountries(false), 200);
-                      }}
-                      disabled={isFormProcessing}
-                      className="w-full bg-neutral-50 border border-neutral-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-neutral-900 focus:outline-none transition disabled:opacity-60 font-medium text-neutral-800"
-                      placeholder="Search country..."
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="country"
+                        id="country"
+                        value={countrySearch}
+                        onChange={(e) => {
+                          setCountrySearch(e.target.value);
+                          setFormData(prev => ({ ...prev, country: e.target.value }));
+                          setShowCountries(true);
+                        }}
+                        onFocus={() => setShowCountries(true)}
+                        disabled={isFormProcessing}
+                        className="w-full px-4 py-2 bg-white/50 backdrop-blur-sm border border-neutral-200 rounded-lg focus:ring-2 focus:ring-neutral-900 outline-none transition-all disabled:opacity-60"
+                        placeholder="Search for your country..."
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-400">
+                        <ChevronDown size={16} />
+                      </span>
+                    </div>
                     {showCountries && (
-                      <ul className="absolute z-20 left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-xl shadow-lg max-h-48 overflow-y-auto custom-scrollbar">
-                        {COUNTRIES.filter(c => c.toLowerCase().includes(countrySearch.toLowerCase())).length > 0 ? (
-                          COUNTRIES.filter(c => c.toLowerCase().includes(countrySearch.toLowerCase())).map((c) => (
+                      <ul className="absolute z-50 w-full mt-1 max-h-60 overflow-y-auto bg-white/95 backdrop-blur-md border border-neutral-100 rounded-lg shadow-xl custom-scrollbar">
+                        {filteredCountries.length > 0 ? (
+                          filteredCountries.map((c) => (
                             <li
                               key={c}
-                              onMouseDown={() => {
+                              onClick={() => {
                                 setCountrySearch(c);
                                 setFormData(prev => ({ ...prev, country: c }));
+                                setShowCountries(false);
                               }}
-                              className="px-4 py-2 text-sm text-neutral-800 hover:bg-neutral-50 cursor-pointer font-medium transition-colors"
+                              className="px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 cursor-pointer transition-colors font-medium"
                             >
                               {c}
                             </li>
                           ))
                         ) : (
-                          <li className="px-4 py-2.5 text-xs text-neutral-400 text-center font-medium">No countries found</li>
+                          <li className="px-4 py-2 text-sm text-neutral-400 text-center font-medium">No countries found</li>
                         )}
                       </ul>
                     )}
@@ -645,7 +696,14 @@ const CheckoutPage = () => {
 
         </div>
       </div>
-      <TestHelper onAutofill={setFormData} />
+      <TestHelper
+        onAutofill={(data) => {
+          setFormData(prev => ({ ...prev, ...data }));
+          if (data.country) {
+            setCountrySearch(data.country);
+          }
+        }}
+      />
     </div>
   );
 };

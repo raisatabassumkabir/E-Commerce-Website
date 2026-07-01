@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const connectDB = require('./src/config/db');
@@ -18,12 +20,35 @@ const settingsRoutes = require('./src/routes/settingsRoutes');
 connectDB();
 
 const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:3000'].filter(Boolean),
+    methods: ["GET", "POST"]
+  }
+});
+
+app.set('io', io);
+
+io.on('connection', (socket) => {
+  console.log('A client connected:', socket.id);
+  
+  socket.on('join-admin-room', () => {
+    socket.join('admin-alerts');
+    console.log(`Socket ${socket.id} joined admin-alerts`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
 
 const { stripeWebhook } = require('./src/controllers/paymentController');
 
 // ── Stripe webhook MUST use raw body ──────────────────────────────────────────
 // Mount webhook route BEFORE express.json() so the raw body is preserved
-app.post('/api/webhook/stripe', express.raw({ type: 'application/json' }), stripeWebhook);
+app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
 
 // ── Core middleware ────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
@@ -34,24 +59,23 @@ app.use(cookieParser());
 const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// In development allow any localhost port (Vite may shift from 5173 → 5174 etc.)
-const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? [process.env.CLIENT_URL].filter(Boolean)
-  : [
-      process.env.CLIENT_URL,
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:5175',
-      'http://localhost:3000',
-    ].filter(Boolean);
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.CLIENT_URL,
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000'
+].filter(Boolean);
 
 app.use(
   cors({
-    origin: (origin, callback) => {
+    origin: function (origin, callback) {
       // Allow requests with no origin (mobile apps, curl, Postman)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS: origin '${origin}' not allowed`));
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -94,12 +118,12 @@ app.use(errorHandler);
 
 // ── Start server ───────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
+const serverListener = server.listen(PORT, () => {
   console.log(`✅  Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
 
 // Handle unhandled promise rejections gracefully
 process.on('unhandledRejection', (err) => {
   console.error(`❌  Unhandled Rejection:`, err);
-  server.close(() => process.exit(1));
+  serverListener.close(() => process.exit(1));
 });

@@ -307,11 +307,11 @@ const getMyOrders = asyncHandler(async (req, res) => {
   const skip = (Number(page) - 1) * Number(limit);
 
   const [orders, total] = await Promise.all([
-    Order.find({ user: req.user._id })
+    Order.find({ user: req.user._id, paymentStatus: { $ne: 'Pending' } })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit)),
-    Order.countDocuments({ user: req.user._id }),
+    Order.countDocuments({ user: req.user._id, paymentStatus: { $ne: 'Pending' } }),
   ]);
 
   res.status(200).json({ success: true, orders, total });

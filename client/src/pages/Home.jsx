@@ -63,7 +63,7 @@ const Home = () => {
           {/* Left Text */}
           <div className="animate-slide-up">
             <div className="inline-flex items-center gap-2 px-3 py-1 border border-line rounded-sm mb-8 text-xs font-medium uppercase tracking-widest text-brand-900/60">
-              New SS 2025 Collection
+              {settings?.heroSubtitle || 'NEW COLLECTION'}
             </div>
             <h1 className="font-display font-medium text-6xl lg:text-7xl mb-8 text-balance text-brand-900 leading-tight">
               Wear What You Feel.
@@ -106,13 +106,13 @@ const Home = () => {
           {/* Right — Clean editorial layout */}
           <div className="relative hidden lg:block h-[700px]">
             <div className="absolute top-0 right-0 w-72 h-[450px] overflow-hidden shadow-elegant bg-nude-100 border border-line p-2">
-              <img src={settings?.heroImages?.[0] || "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600"} alt="Featured" className="w-full h-full object-cover grayscale-[20%]" />
+              <img src={settings?.heroImageTopRight || "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600"} alt="Top Right" className="w-full h-full object-cover grayscale-[20%]" />
             </div>
             <div className="absolute bottom-0 left-0 w-64 h-[400px] overflow-hidden shadow-elegant bg-white border border-line p-2 z-10">
-              <img src={settings?.heroImages?.[1] || "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=600"} alt="Featured" className="w-full h-full object-cover grayscale-[20%]" />
+              <img src={settings?.heroImageBottomLeft || "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=600"} alt="Bottom Left" className="w-full h-full object-cover grayscale-[20%]" />
             </div>
             <div className="absolute top-1/2 left-1/3 -translate-y-1/2 w-48 h-64 overflow-hidden shadow-elegant border border-line p-1 bg-white z-20">
-              <img src={settings?.heroImages?.[2] || "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400"} alt="Featured" className="w-full h-full object-cover grayscale-[10%]" />
+              <img src={settings?.heroImageMain || "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400"} alt="Main Foreground" className="w-full h-full object-cover grayscale-[10%]" />
             </div>
           </div>
         </div>

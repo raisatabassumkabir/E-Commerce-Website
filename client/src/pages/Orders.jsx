@@ -32,7 +32,7 @@ const Orders = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order) => (
+          {orders.filter(order => order.paymentStatus !== 'Pending').map((order) => (
             <div key={order._id} id={`order-card-${order._id}`} className="glass-sm rounded-2xl p-6 animate-fade-in">
               {/* Header */}
               <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
@@ -70,7 +70,7 @@ const Orders = () => {
                 </div>
                 <Link
                   id={`order-detail-${order._id}`}
-                  to={`/orders/${order._id}`}
+                  to={`/order/${order._id}`}
                   className="btn-secondary btn-sm rounded-xl"
                 >
                   View Details <ArrowRight size={14} />

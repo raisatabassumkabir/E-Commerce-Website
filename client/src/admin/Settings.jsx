@@ -12,7 +12,10 @@ const Settings = () => {
   
   const [storeName, setStoreName] = useState('ThreadHaus');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [heroImages, setHeroImages] = useState([]);
+  const [heroSubtitle, setHeroSubtitle] = useState('NEW SS 2026 COLLECTION');
+  const [heroImageMain, setHeroImageMain] = useState('');
+  const [heroImageTopRight, setHeroImageTopRight] = useState('');
+  const [heroImageBottomLeft, setHeroImageBottomLeft] = useState('');
   const [categoryImages, setCategoryImages] = useState({
     men: '',
     women: '',
@@ -23,7 +26,11 @@ const Settings = () => {
   });
 
   // State to hold new local files selected for upload
-  const [newHeroFiles, setNewHeroFiles] = useState([]);
+  const [heroFiles, setHeroFiles] = useState({
+    heroImageMain: null,
+    heroImageTopRight: null,
+    heroImageBottomLeft: null,
+  });
   const [categoryFiles, setCategoryFiles] = useState({
     men: null,
     women: null,
@@ -34,7 +41,11 @@ const Settings = () => {
   });
 
   // Preview URLs for new local files
-  const [newHeroPreviews, setNewHeroPreviews] = useState([]);
+  const [heroPreviews, setHeroPreviews] = useState({
+    heroImageMain: '',
+    heroImageTopRight: '',
+    heroImageBottomLeft: '',
+  });
   const [categoryPreviews, setCategoryPreviews] = useState({});
 
   useEffect(() => {
@@ -48,7 +59,10 @@ const Settings = () => {
       if (data.success && data.settings) {
         setStoreName(data.settings.storeName || 'ThreadHaus');
         setMaintenanceMode(!!data.settings.maintenanceMode);
-        setHeroImages(data.settings.heroImages || []);
+        setHeroSubtitle(data.settings.heroSubtitle || 'NEW SS 2026 COLLECTION');
+        setHeroImageMain(data.settings.heroImageMain || '');
+        setHeroImageTopRight(data.settings.heroImageTopRight || '');
+        setHeroImageBottomLeft(data.settings.heroImageBottomLeft || '');
         setCategoryImages(data.settings.categoryImages || {});
       }
     } catch (err) {
@@ -58,23 +72,27 @@ const Settings = () => {
     }
   };
 
-  const handleHeroFileChange = (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
+  const handleHeroFileChange = (slot, e) => {
+    const file = e.target.files[0];
+    if (!file) return;
     
-    setNewHeroFiles(prev => [...prev, ...files]);
-    
-    const previews = files.map(file => URL.createObjectURL(file));
-    setNewHeroPreviews(prev => [...prev, ...previews]);
+    setHeroFiles(prev => ({ ...prev, [slot]: file }));
+    setHeroPreviews(prev => ({ ...prev, [slot]: URL.createObjectURL(file) }));
   };
 
-  const removeNewHeroFile = (index) => {
-    setNewHeroFiles(prev => prev.filter((_, i) => i !== index));
-    setNewHeroPreviews(prev => prev.filter((_, i) => i !== index));
+  const removeHeroImage = (slot) => {
+    setHeroFiles(prev => ({ ...prev, [slot]: null }));
+    setHeroPreviews(prev => ({ ...prev, [slot]: '' }));
+    if (slot === 'heroImageMain') setHeroImageMain('');
+    if (slot === 'heroImageTopRight') setHeroImageTopRight('');
+    if (slot === 'heroImageBottomLeft') setHeroImageBottomLeft('');
   };
 
-  const removeExistingHeroImage = (index) => {
-    setHeroImages(prev => prev.filter((_, i) => i !== index));
+  const getHeroPreview = (slot) => {
+    if (heroPreviews[slot]) return heroPreviews[slot];
+    if (slot === 'heroImageMain') return heroImageMain;
+    if (slot === 'heroImageTopRight') return heroImageTopRight;
+    return heroImageBottomLeft;
   };
 
   const handleCategoryFileChange = (cat, e) => {
@@ -93,11 +111,20 @@ const Settings = () => {
       const fd = new FormData();
       fd.append('storeName', storeName);
       fd.append('maintenanceMode', maintenanceMode);
-      fd.append('existingHeroImages', JSON.stringify(heroImages));
+      fd.append('heroSubtitle', heroSubtitle);
 
-      // Append new hero image uploads
-      newHeroFiles.forEach(file => {
-        fd.append('heroImages', file);
+      // Append hero image files or existing URLs
+      const heroSlots = ['heroImageMain', 'heroImageTopRight', 'heroImageBottomLeft'];
+      heroSlots.forEach(slot => {
+        if (heroFiles[slot]) {
+          fd.append(slot, heroFiles[slot]);
+        } else {
+          let existingVal = '';
+          if (slot === 'heroImageMain') existingVal = heroImageMain;
+          else if (slot === 'heroImageTopRight') existingVal = heroImageTopRight;
+          else existingVal = heroImageBottomLeft;
+          fd.append(`existing${slot.charAt(0).toUpperCase() + slot.slice(1)}`, existingVal);
+        }
       });
 
       // Append category images files and/or existing strings
@@ -116,12 +143,23 @@ const Settings = () => {
       if (data.success && data.settings) {
         setStoreName(data.settings.storeName || 'ThreadHaus');
         setMaintenanceMode(!!data.settings.maintenanceMode);
-        setHeroImages(data.settings.heroImages || []);
+        setHeroSubtitle(data.settings.heroSubtitle || 'NEW SS 2026 COLLECTION');
+        setHeroImageMain(data.settings.heroImageMain || '');
+        setHeroImageTopRight(data.settings.heroImageTopRight || '');
+        setHeroImageBottomLeft(data.settings.heroImageBottomLeft || '');
         setCategoryImages(data.settings.categoryImages || {});
         
         // Clear local file states
-        setNewHeroFiles([]);
-        setNewHeroPreviews([]);
+        setHeroFiles({
+          heroImageMain: null,
+          heroImageTopRight: null,
+          heroImageBottomLeft: null,
+        });
+        setHeroPreviews({
+          heroImageMain: '',
+          heroImageTopRight: '',
+          heroImageBottomLeft: '',
+        });
         setCategoryFiles({
           men: null,
           women: null,
@@ -218,61 +256,83 @@ const Settings = () => {
 
         {/* Right column - Storefront Assets */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Hero Images Banner CMS */}
+          {/* Hero Content & Image Slots CMS */}
           <div className="bg-white/70 backdrop-blur-md border border-white shadow-sm rounded-2xl p-6 space-y-6">
             <h2 className="text-neutral-900 font-semibold text-base flex items-center gap-2 border-b border-neutral-100 pb-3">
               <Sparkles size={18} className="text-brand-900" />
-              Hero Banner Carousel Images (Max 6)
+              Hero Section CMS
             </h2>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {/* Existing Images */}
-              {heroImages.map((url, i) => (
-                <div key={`existing-${i}`} className="relative aspect-[3/4] rounded-xl overflow-hidden group border border-neutral-200 bg-neutral-50 shadow-sm">
-                  <img src={url} alt={`Hero ${i}`} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button
-                      type="button"
-                      onClick={() => removeExistingHeroImage(i)}
-                      className="p-2 bg-white/90 rounded-full text-red-600 hover:bg-white shadow"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+            {/* Hero Subtitle Text Field */}
+            <div className="space-y-2 max-w-md">
+              <label className="block text-sm font-semibold text-neutral-700">Hero Subtitle</label>
+              <input
+                type="text"
+                value={heroSubtitle}
+                onChange={(e) => setHeroSubtitle(e.target.value)}
+                className="input w-full"
+                placeholder="NEW SS 2026 COLLECTION"
+              />
+            </div>
 
-              {/* Newly Uploaded Image Previews */}
-              {newHeroPreviews.map((url, i) => (
-                <div key={`new-${i}`} className="relative aspect-[3/4] rounded-xl overflow-hidden group border border-brand-200 bg-brand-50/10 shadow-sm">
-                  <img src={url} alt={`New Hero ${i}`} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button
-                      type="button"
-                      onClick={() => removeNewHeroFile(i)}
-                      className="p-2 bg-white/90 rounded-full text-red-600 hover:bg-white shadow"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                  <span className="absolute top-2 left-2 bg-brand-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">NEW</span>
-                </div>
-              ))}
-
-              {/* Add Box */}
-              {heroImages.length + newHeroFiles.length < 6 && (
-                <label className="border-2 border-dashed border-neutral-200 hover:border-neutral-400 rounded-xl aspect-[3/4] flex flex-col items-center justify-center cursor-pointer transition-colors bg-white/30 hover:bg-white/50">
-                  <ImagePlus size={24} className="text-neutral-400 mb-2" />
-                  <span className="text-[11px] font-medium text-neutral-500">Upload Image</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleHeroFileChange}
-                    className="hidden"
-                  />
-                </label>
-              )}
+            {/* Hero Image Slots */}
+            <div className="space-y-4">
+              <label className="block text-sm font-semibold text-neutral-700">Hero Layout Image Slots</label>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                {[
+                  { id: 'heroImageMain', label: 'Frame 1 (Main Center)', desc: 'Large foreground focal image' },
+                  { id: 'heroImageTopRight', label: 'Frame 2 (Top Right Offset)', desc: 'Background right offset image' },
+                  { id: 'heroImageBottomLeft', label: 'Frame 3 (Bottom Left Offset)', desc: 'Background left offset image' },
+                ].map(({ id, label, desc }) => {
+                  const preview = getHeroPreview(id);
+                  return (
+                    <div key={id} className="space-y-3">
+                      <div>
+                        <span className="block text-xs font-bold text-neutral-800 uppercase tracking-wider">{label}</span>
+                        <span className="block text-[11px] text-neutral-400 mt-0.5">{desc}</span>
+                      </div>
+                      
+                      <div className="relative aspect-[3/4] rounded-xl overflow-hidden border border-neutral-200 bg-neutral-50 shadow-sm group">
+                        {preview ? (
+                          <>
+                            <img src={preview} alt={label} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <label className="p-2 bg-white/95 rounded-full text-neutral-800 hover:bg-white shadow cursor-pointer transition-colors">
+                                <ImagePlus size={16} />
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleHeroFileChange(id, e)}
+                                  className="hidden"
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => removeHeroImage(id)}
+                                className="p-2 bg-white/95 rounded-full text-red-600 hover:bg-white shadow transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-neutral-100/50 transition-colors">
+                            <ImagePlus size={24} className="text-neutral-400 mb-2" />
+                            <span className="text-[11px] font-medium text-neutral-500">Upload Frame Image</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleHeroFileChange(id, e)}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

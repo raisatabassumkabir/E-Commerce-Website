@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
+import toast, { Toaster } from 'react-hot-toast';
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Menu, X,
   LogOut, ChevronRight, Sparkles, Settings as SettingsIcon,
@@ -24,8 +26,44 @@ const AdminLayout = () => {
     navigate('/');
   };
 
+  useEffect(() => {
+    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000');
+
+    socket.on('connect', () => {
+      socket.emit('join-admin-room'); 
+    });
+
+    socket.on('new-order', (data) => {
+      toast.custom((t) => (
+        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white/90 backdrop-blur-md shadow-2xl rounded-2xl pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
+          <div className="flex-1 w-0 p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0 pt-0.5">
+                <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <span className="text-emerald-600 text-xl">🛍️</span>
+                </div>
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-bold text-neutral-900">{data.title}</p>
+                <p className="mt-1 text-sm text-neutral-500">{data.message}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex border-l border-neutral-200">
+            <button onClick={() => toast.dismiss(t.id)} className="w-full border border-transparent rounded-none rounded-r-2xl p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none">
+              Close
+            </button>
+          </div>
+        </div>
+      ), { duration: 8000, position: 'top-right' });
+    });
+
+    return () => socket.disconnect();
+  }, []);
+
   return (
-    <div className="min-h-screen flex bg-[#F9F8F6]">
+    <div className="min-h-screen flex bg-[#F9F8F6] admin-layout">
+      <Toaster />
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
       <aside
         className={`${sidebarOpen ? 'w-64' : 'w-16'} sidebar-transition flex-shrink-0 bg-white border-r border-neutral-200/80 flex flex-col min-h-screen sticky top-0 h-screen z-20`}

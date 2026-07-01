@@ -17,6 +17,7 @@ import ProductPage from './pages/ProductPage';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Orders from './pages/Orders';
+import OrderDetails from './pages/OrderDetails';
 import PaymentSuccess from './pages/PaymentSuccess';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -56,8 +57,8 @@ const App = () => {
             element={<ProtectedRoute><Orders /></ProtectedRoute>}
           />
           <Route
-            path="/orders/:id"
-            element={<ProtectedRoute><Orders /></ProtectedRoute>}
+            path="/order/:id"
+            element={<ProtectedRoute><OrderDetails /></ProtectedRoute>}
           />
         </Route>
 

@@ -11,7 +11,9 @@ router.put(
   protect,
   adminOnly,
   uploadProductImages.fields([
-    { name: 'heroImages', maxCount: 6 },
+    { name: 'heroImageMain', maxCount: 1 },
+    { name: 'heroImageTopRight', maxCount: 1 },
+    { name: 'heroImageBottomLeft', maxCount: 1 },
     { name: 'menImage', maxCount: 1 },
     { name: 'womenImage', maxCount: 1 },
     { name: 'accessoriesImage', maxCount: 1 },
