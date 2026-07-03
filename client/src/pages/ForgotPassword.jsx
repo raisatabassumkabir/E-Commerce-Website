@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import Logo from '../components/Logo';
@@ -83,9 +82,9 @@ const ForgotPassword = () => {
           </button>
         </form>
 
-        <p className="text-center text-neutral-500 mt-6 text-sm">
-          <Link to="/login" className="inline-flex items-center gap-2 text-neutral-600 hover:text-neutral-950 transition-colors font-medium">
-            <ArrowLeft size={16} /> Back to Login
+        <p className="text-center mt-6 text-sm">
+          <Link to="/login" className="text-neutral-600 hover:text-neutral-950 transition-colors font-medium">
+            Back to Login
           </Link>
         </p>
       </div>
