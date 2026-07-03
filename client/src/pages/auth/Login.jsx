@@ -8,20 +8,26 @@ import Logo from '../../components/Logo';
 const Login = () => {
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
   const { login, isLoading } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from || '/';
 
-  const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const handleChange = (e) => {
+    setError('');
+    setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     const result = await login(form);
     if (result.success) {
       toast.success('Welcome back!', { style: { background: '#1a1a27', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' } });
       navigate(from, { replace: true });
     } else {
+      setError(result.message || 'Invalid email or password.');
       toast.error(result.message, { style: { background: '#1a1a27', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' } });
     }
   };
@@ -41,6 +47,12 @@ const Login = () => {
 
         {/* Form */}
         <form id="login-form" onSubmit={handleSubmit} className="bg-white/60 backdrop-blur-xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl p-8 sm:p-10 space-y-5">
+          {error && (
+            <div className="p-4 text-sm text-red-800 rounded-lg bg-red-50/80 border border-red-200/50 backdrop-blur-sm" role="alert">
+              <span className="font-semibold">Error: </span> {error}
+            </div>
+          )}
+
           <div>
             <label htmlFor="login-email" className="block text-xs font-semibold text-neutral-700 tracking-wide uppercase mb-1.5">Email address</label>
             <input
@@ -78,6 +90,12 @@ const Login = () => {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Link to="/forgot-password" className="text-xs text-neutral-500 hover:text-neutral-900 hover:underline transition-colors font-medium">
+              Forgot Password?
+            </Link>
           </div>
 
           <button
