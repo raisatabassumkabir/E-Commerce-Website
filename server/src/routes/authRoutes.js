@@ -9,6 +9,9 @@ const {
   updatePassword,
   addAddress,
   updateCart,
+  verifyEmail,
+  forgotPassword,
+  resetPassword,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const { uploadAvatar } = require('../middleware/uploadMiddleware');
@@ -29,10 +32,25 @@ const loginValidation = [
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
+const forgotPasswordValidation = [
+  body('email').isEmail().withMessage('Valid email is required'),
+];
+
+const resetPasswordValidation = [
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters'),
+];
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
 router.post('/logout', logout);
+router.get('/verify-email', verifyEmail);
+router.post('/verify-email', verifyEmail);
+router.post('/forgot-password', forgotPasswordValidation, forgotPassword);
+router.post('/reset-password', resetPasswordValidation, resetPassword);
+router.post('/reset-password/:token', resetPasswordValidation, resetPassword);
 router.get('/me', protect, getMe);
 router.put('/profile', protect, uploadAvatar.single('avatar'), updateProfile);
 router.put('/password', protect, updatePassword);
