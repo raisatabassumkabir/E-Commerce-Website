@@ -1,12 +1,17 @@
 import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import api from '../services/api';
+import { useAuthStore } from '../store/useAuthStore';
 import toast from 'react-hot-toast';
 import Logo from '../components/Logo';
 
 const ResetPassword = () => {
-  const { token } = useParams();
+  const { token: paramToken } = useParams();
+  const [searchParams] = useSearchParams();
+  const queryToken = searchParams.get('token');
+  const token = paramToken || queryToken;
+
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -29,8 +34,12 @@ const ResetPassword = () => {
     setError('');
 
     try {
-      await api.post(`/auth/reset-password/${token}`, { password });
+      const { data } = await api.post('/auth/reset-password', { token, password });
       toast.success('Password reset successful! Logging you in.', { style: { background: '#1a1a27', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' } });
+      // Auto-login: update auth store with the returned user
+      if (data.user) {
+        useAuthStore.getState().fetchCurrentUser();
+      }
       navigate('/', { replace: true });
     } catch (err) {
       const errMsg = err.response?.data?.message || 'Failed to reset password.';

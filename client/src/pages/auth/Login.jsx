@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, ArrowRight, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Mail } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import toast from 'react-hot-toast';
 import Logo from '../../components/Logo';
@@ -9,6 +9,7 @@ const Login = () => {
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isUnverified, setIsUnverified] = useState(false);
   const { login, isLoading } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -16,18 +17,26 @@ const Login = () => {
 
   const handleChange = (e) => {
     setError('');
+    setIsUnverified(false);
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setIsUnverified(false);
     const result = await login(form);
     if (result.success) {
       toast.success('Welcome back!', { style: { background: '#1a1a27', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' } });
       navigate(from, { replace: true });
     } else {
-      setError(result.message || 'Invalid email or password.');
+      // Check if this is a 403 unverified account error
+      if (result.status === 403) {
+        setIsUnverified(true);
+        setError(result.message);
+      } else {
+        setError(result.message || 'Invalid email or password.');
+      }
       toast.error(result.message, { style: { background: '#1a1a27', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' } });
     }
   };
@@ -47,7 +56,25 @@ const Login = () => {
 
         {/* Form */}
         <form id="login-form" onSubmit={handleSubmit} className="bg-white/60 backdrop-blur-xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl p-8 sm:p-10 space-y-5">
-          {error && (
+          {/* Unverified account banner — distinct from generic errors */}
+          {isUnverified && (
+            <div
+              id="login-unverified-banner"
+              className="p-4 text-sm rounded-lg bg-amber-50/80 border border-amber-300/60 backdrop-blur-sm flex items-start gap-3"
+              role="alert"
+            >
+              <Mail size={20} className="text-amber-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-amber-900 mb-1">Email Not Verified</p>
+                <p className="text-amber-800">
+                  {error || 'Your email address is unverified. Please check your inbox for the activation link.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Generic error */}
+          {error && !isUnverified && (
             <div className="p-4 text-sm text-red-800 rounded-lg bg-red-50/80 border border-red-200/50 backdrop-blur-sm" role="alert">
               <span className="font-semibold">Error: </span> {error}
             </div>

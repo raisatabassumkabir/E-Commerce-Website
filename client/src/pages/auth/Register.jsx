@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, ArrowRight, Sparkles, Check } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Eye, EyeOff, ArrowRight, Check, Mail } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import toast from 'react-hot-toast';
 import Logo from '../../components/Logo';
@@ -10,8 +10,8 @@ const BENEFITS = ['Free shipping on orders $100+', 'Exclusive member discounts',
 const Register = () => {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
+  const [registrationComplete, setRegistrationComplete] = useState(false);
   const { register, isLoading } = useAuthStore();
-  const navigate = useNavigate();
 
   const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
@@ -23,16 +23,55 @@ const Register = () => {
     }
     const result = await register(form);
     if (result.success) {
-      toast.success('Account created! Welcome to ThreadHaus.', {
+      setRegistrationComplete(true);
+      toast.success('Account created! Check your email to verify.', {
         style: { background: '#1a1a27', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' },
       });
-      navigate('/');
     } else {
       toast.error(result.message, {
         style: { background: '#1a1a27', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' },
       });
     }
   };
+
+  // After successful registration, show a "check your email" screen
+  if (registrationComplete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-[#FDFBF9] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-100 via-[#FDFBF9] to-[#FDFBF9] relative overflow-hidden">
+        <div className="w-full max-w-md relative z-10 animate-slide-up">
+          <div className="text-center mb-10">
+            <Link to="/" className="inline-flex items-center gap-2 md:gap-3 group mb-6">
+              <Logo className="w-10 h-10 transition-transform duration-500 group-hover:scale-105" />
+              <span className="font-display font-bold text-2xl gradient-text">ThreadHaus</span>
+            </Link>
+          </div>
+
+          <div className="bg-white/60 backdrop-blur-xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl p-8 sm:p-10 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50 border border-blue-200/50 flex items-center justify-center">
+              <Mail size={32} className="text-blue-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight mb-2">
+              Check Your Email
+            </h1>
+            <p className="text-neutral-500 mb-2">
+              We&apos;ve sent a verification link to:
+            </p>
+            <p className="text-neutral-900 font-semibold mb-4">{form.email}</p>
+            <p className="text-neutral-400 text-sm mb-6">
+              Click the link in the email to activate your account. The link expires in 24 hours.
+            </p>
+            <Link
+              to="/login"
+              id="register-go-to-login"
+              className="inline-flex items-center justify-center w-full bg-neutral-950 text-white rounded-lg py-3.5 text-sm font-medium hover:bg-neutral-800 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+            >
+              Go to Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#FDFBF9] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-100 via-[#FDFBF9] to-[#FDFBF9] relative overflow-hidden">

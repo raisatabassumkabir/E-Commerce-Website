@@ -20,15 +20,17 @@ const register = asyncHandler(async (req, res, next) => {
     return next(new AppError('An account with this email already exists.', 409));
   }
 
-  // Generate unique verification token
+  // Generate unique verification token with 24-hour expiration
   const verificationToken = crypto.randomBytes(32).toString('hex');
+  const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
   const user = await User.create({
     name,
     email,
     password,
     verificationToken,
-    isVerified: false
+    verificationTokenExpires,
+    isVerified: false,
   });
 
   if (guestCart && Array.isArray(guestCart)) {
@@ -66,9 +68,12 @@ const login = asyncHandler(async (req, res, next) => {
     return next(new AppError('Invalid email or password.', 401));
   }
 
-  // Block login if user is not verified
+  // Block login if user is not verified — return 403 Forbidden
   if (!user.isVerified) {
-    return next(new AppError('Please verify your email address before logging in.', 403));
+    return res.status(403).json({
+      success: false,
+      message: 'Your email address is unverified. Please check your inbox for the activation link.',
+    });
   }
 
   if (!user.isActive) {
@@ -214,13 +219,20 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
     return next(new AppError('Verification token is missing.', 400));
   }
 
-  const user = await User.findOne({ verificationToken: token });
+  // Find user by verificationToken WHERE the expiration is in the future
+  const user = await User.findOne({
+    verificationToken: token,
+    verificationTokenExpires: { $gt: Date.now() },
+  });
+
   if (!user) {
     return next(new AppError('Invalid or expired verification token.', 400));
   }
 
+  // Toggle verified state and clear tokens
   user.isVerified = true;
   user.verificationToken = undefined;
+  user.verificationTokenExpires = undefined;
   await user.save();
 
   // Log user in automatically after successful verification
@@ -249,15 +261,19 @@ const forgotPassword = asyncHandler(async (req, res, next) => {
 
   const { email } = req.body;
 
+  // Search the entire collection by email
   const user = await User.findOne({ email });
   if (!user) {
-    return next(new AppError('No account found with this email address.', 404));
+    return res.status(404).json({
+      success: false,
+      message: 'No account found with this email address.',
+    });
   }
 
-  // Generate token and expiration (10 minutes)
+  // Generate token and 1-hour expiration
   const resetToken = crypto.randomBytes(32).toString('hex');
   user.resetPasswordToken = resetToken;
-  user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
 
   await user.save({ validateBeforeSave: false });
 
@@ -289,6 +305,7 @@ const resetPassword = asyncHandler(async (req, res, next) => {
     return next(new AppError('Reset token is missing.', 400));
   }
 
+  // Match resetPasswordToken and verify expiration is in the future
   const user = await User.findOne({
     resetPasswordToken: token,
     resetPasswordExpires: { $gt: Date.now() },
@@ -298,7 +315,7 @@ const resetPassword = asyncHandler(async (req, res, next) => {
     return next(new AppError('Token is invalid or has expired.', 400));
   }
 
-  // Set the new password and clear the reset token/expires fields
+  // Hash the new password (handled by pre-save hook) and clear reset fields
   user.password = password;
   user.resetPasswordToken = undefined;
   user.resetPasswordExpires = undefined;
@@ -306,6 +323,7 @@ const resetPassword = asyncHandler(async (req, res, next) => {
   // As a security best practice, resetting password also verifies the user
   user.isVerified = true;
   user.verificationToken = undefined;
+  user.verificationTokenExpires = undefined;
 
   await user.save();
 

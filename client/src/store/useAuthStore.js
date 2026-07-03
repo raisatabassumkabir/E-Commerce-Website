@@ -20,7 +20,11 @@ export const useAuthStore = create((set, get) => ({
       return { success: true };
     } catch (err) {
       set({ isLoading: false });
-      return { success: false, message: err.response?.data?.message || 'Login failed' };
+      return {
+        success: false,
+        status: err.response?.status,
+        message: err.response?.data?.message || 'Login failed',
+      };
     }
   },
 
@@ -29,11 +33,10 @@ export const useAuthStore = create((set, get) => ({
     try {
       const guestCart = useCartStore.getState().items;
       const { data } = await api.post('/auth/register', { ...formData, guestCart });
-      set({ user: data.user, isLoading: false });
-      if (data.cart) {
-        useCartStore.setState({ items: data.cart });
-      }
-      return { success: true };
+      // Registration no longer logs the user in — they must verify their email first.
+      // The backend returns a success message, not user data.
+      set({ isLoading: false });
+      return { success: true, message: data.message };
     } catch (err) {
       set({ isLoading: false });
       return { success: false, message: err.response?.data?.message || 'Registration failed' };
