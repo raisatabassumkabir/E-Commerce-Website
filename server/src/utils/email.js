@@ -1,27 +1,37 @@
 const nodemailer = require('nodemailer');
+const dns = require('dns');
 
 // ---------------------------------------------------------------------------
-// Transporter — Gmail SMTP via Nodemailer
+// Transporter — Gmail SMTP via Nodemailer (port 587 / STARTTLS)
 // Requires the following environment variables to be set:
 //   EMAIL_USER  – your Gmail address  (e.g. yourapp@gmail.com)
 //   EMAIL_PASS  – your Gmail App Password (NOT your account password)
 //                 Generate one at: https://myaccount.google.com/apppasswords
 //
-// Port 587 (STARTTLS) is used instead of 465 (SSL) because Render's free
-// tier blocks outbound connections on port 465 at the firewall level,
-// causing ENETUNREACH / Connection timeout errors. Port 587 is explicitly
-// left open by Render for transactional email delivery.
+// Port 587 (STARTTLS) is used because Render's free tier blocks port 465.
+//
+// CRITICAL — IPv4 fix:
+// Render's free tier containers do not support IPv6. By default, Node's DNS
+// resolver returns an IPv6 address for 'smtp.gmail.com' first, which causes
+// an immediate ENETUNREACH error. The `dnsLookup` override forces family:4
+// so Nodemailer always connects over IPv4.
 // ---------------------------------------------------------------------------
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false, // false = STARTTLS on port 587 (true would force SSL on 465)
+  secure: false,              // false = STARTTLS on 587 (true would force SSL on 465)
+  connectionTimeout: 10000,  // 10 s — fail fast instead of hanging indefinitely
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
   tls: {
-    rejectUnauthorized: false, // Bypasses strict certificate checks in hosted environments
+    rejectUnauthorized: false, // Allows TLS handshake in restricted hosted environments
+  },
+  // CRITICAL FIX: Forces Nodemailer to resolve smtp.gmail.com to an IPv4
+  // address instead of IPv6, which is unreachable on Render's free tier.
+  dnsLookup: (hostname, options, callback) => {
+    dns.lookup(hostname, { family: 4 }, callback);
   },
 });
 
