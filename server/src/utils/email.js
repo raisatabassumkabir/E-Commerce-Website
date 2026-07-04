@@ -6,14 +6,25 @@ const nodemailer = require('nodemailer');
 //   EMAIL_USER  – your Gmail address  (e.g. yourapp@gmail.com)
 //   EMAIL_PASS  – your Gmail App Password (NOT your account password)
 //                 Generate one at: https://myaccount.google.com/apppasswords
+//
+// Port 587 (STARTTLS) is used instead of 465 (SSL) because Render's free
+// tier blocks outbound connections on port 465 at the firewall level,
+// causing ENETUNREACH / Connection timeout errors. Port 587 is explicitly
+// left open by Render for transactional email delivery.
 // ---------------------------------------------------------------------------
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // false = STARTTLS on port 587 (true would force SSL on 465)
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  tls: {
+    rejectUnauthorized: false, // Bypasses strict certificate checks in hosted environments
+  },
 });
+
 
 // Warn early at startup so missing config is obvious in logs
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
