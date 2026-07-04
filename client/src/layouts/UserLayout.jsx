@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { ShoppingBag, User, Search, Menu, X, LogOut, Package, ChevronDown } from 'lucide-react';
 import { Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
@@ -30,13 +30,45 @@ const UserLayout = () => {
     navigate('/');
   };
 
+  const [searchParams] = useSearchParams();
+  const { pathname } = useLocation();
+
+  // Read the active category directly from the live URL query string
+  const activeCategoryFromURL = searchParams.get('category') || '';
+  // Whether the user is on /shop at all (with no category = "All")
+  const isOnShop = pathname === '/shop';
+
   const navLinks = [
-    { label: 'Shop', to: '/shop' },
-    { label: 'Men', to: '/shop?category=Men' },
-    { label: 'Women', to: '/shop?category=Women' },
-    { label: 'Kids', to: '/shop?category=Kids' },
-    { label: 'Sale', to: '/shop?category=Sale' },
+    { label: 'Shop', to: '/shop', category: '' },
+    { label: 'Men',   to: '/shop?category=Men',   category: 'Men'   },
+    { label: 'Women', to: '/shop?category=Women', category: 'Women' },
+    { label: 'Kids',  to: '/shop?category=Kids',  category: 'Kids'  },
+    { label: 'Sale',  to: '/shop?category=Sale',  category: 'Sale'  },
   ];
+
+  /**
+   * Determines whether a nav link should show the active underline.
+   * - "Shop" (no category) is active only when on /shop with no category param.
+   * - Category links are active only when their category exactly matches the URL param.
+   */
+  const isNavLinkActive = (link) => {
+    if (!isOnShop) return false;
+    if (link.category === '') return activeCategoryFromURL === '';
+    return activeCategoryFromURL.toLowerCase() === link.category.toLowerCase();
+  };
+
+  /**
+   * Navigate to a category, clearing all other filters so the shop grid
+   * starts fresh (no stale subcategory / price / size bleed-through).
+   */
+  const handleNavCategory = (link) => {
+    if (link.category) {
+      navigate(`/shop?category=${link.category}`);
+    } else {
+      navigate('/shop');
+    }
+    setIsMobileMenuOpen(false);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-nude-50">
@@ -56,20 +88,25 @@ const UserLayout = () => {
 
             {/* Desktop nav links */}
             <div className="hidden md:flex items-center gap-6">
-              {navLinks.map((link) => (
-                <NavLink
-                  key={link.label}
-                  to={link.to}
-                  id={`nav-${link.label.toLowerCase()}`}
-                  className={({ isActive }) =>
-                    `text-xs uppercase tracking-[0.15em] font-medium transition-colors duration-200 relative dynamic-underline ${
-                      isActive ? 'text-[#111111]' : 'text-[#111111] hover:text-neutral-500'
-                    }`
-                  }
-                >
-                  {link.label}
-                </NavLink>
-              ))}
+              {navLinks.map((link) => {
+                const active = isNavLinkActive(link);
+                return (
+                  <button
+                    key={link.label}
+                    id={`nav-${link.label.toLowerCase()}`}
+                    onClick={() => handleNavCategory(link)}
+                    className={
+                      `text-xs uppercase tracking-[0.15em] font-medium transition-colors duration-200 relative dynamic-underline ${
+                        active
+                          ? 'text-[#111111] after:absolute after:bottom-[-4px] after:left-0 after:right-0 after:h-[2px] after:bg-purple-600 after:rounded-full'
+                          : 'text-[#111111] hover:text-neutral-500'
+                      }`
+                    }
+                  >
+                    {link.label}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Right icons */}
@@ -177,16 +214,24 @@ const UserLayout = () => {
           {/* Mobile menu */}
           {isMobileMenuOpen && (
             <div className="md:hidden bg-white border-t border-line absolute left-0 right-0 top-16 shadow-elegant p-4 z-40 animate-slide-up">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.label}
-                  to={link.to}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="block py-3 px-4 text-brand-900/70 hover:text-brand-900 hover:bg-nude-50 rounded-sm transition-colors text-sm uppercase tracking-wider"
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {navLinks.map((link) => {
+                const active = isNavLinkActive(link);
+                return (
+                  <button
+                    key={link.label}
+                    onClick={() => handleNavCategory(link)}
+                    className={
+                      `block w-full text-left py-3 px-4 rounded-sm transition-colors text-sm uppercase tracking-wider ${
+                        active
+                          ? 'text-brand-900 font-semibold bg-nude-50 border-l-2 border-purple-600'
+                          : 'text-brand-900/70 hover:text-brand-900 hover:bg-nude-50'
+                      }`
+                    }
+                  >
+                    {link.label}
+                  </button>
+                );
+              })}
               {!user && (
                 <Link
                   to="/login"
