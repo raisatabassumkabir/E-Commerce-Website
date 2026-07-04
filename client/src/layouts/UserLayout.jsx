@@ -1,83 +1,116 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { ShoppingBag, User, Search, Menu, X, LogOut, Package, ChevronDown } from 'lucide-react';
+﻿import { useState, useEffect } from 'react';
+import { Link, NavLink, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Outlet } from 'react-router-dom';
+import { ShoppingBag, User, Search, Menu, X, LogOut, Package, ChevronDown } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCartStore } from '../store/useCartStore';
 import CartDrawer from '../components/CartDrawer';
 import Logo from '../components/Logo';
 
+// â”€â”€â”€ Nav link definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Each entry carries the exact `category` value it maps to in ?category=<value>.
+// An empty string means "no category filter" (the plain /shop landing).
+const NAV_LINKS = [
+  { label: 'Shop',  to: '/shop',                 category: ''       },
+  { label: 'Men',   to: '/shop?category=Men',    category: 'Men'    },
+  { label: 'Women', to: '/shop?category=Women',  category: 'Women'  },
+  { label: 'Kids',  to: '/shop?category=Kids',   category: 'Kids'   },
+  { label: 'Sale',  to: '/shop?category=Sale',   category: 'Sale'   },
+];
+
 const UserLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const { user, logout } = useAuthStore();
-  const isCartOpen = useCartStore((s) => s.isCartOpen);
-  const openCart = useCartStore((s) => s.openCart);
-  const closeCart = useCartStore((s) => s.closeCart);
-  const totalItemsCount = useCartStore((s) => s.items.reduce((acc, item) => acc + item.quantity, 0));
-  const navigate = useNavigate();
+  const [isUserMenuOpen,   setIsUserMenuOpen]   = useState(false);
+  const [isScrolled,       setIsScrolled]       = useState(false);
 
+  const { user, logout }   = useAuthStore();
+  const isCartOpen         = useCartStore((s) => s.isCartOpen);
+  const openCart           = useCartStore((s) => s.openCart);
+  const closeCart          = useCartStore((s) => s.closeCart);
+  const totalItemsCount    = useCartStore((s) =>
+    s.items.reduce((acc, item) => acc + item.quantity, 0)
+  );
+
+  const navigate                = useNavigate();
+  const [searchParams]          = useSearchParams();
+  const { pathname }            = useLocation();
+
+  // The single source of truth: what category does the current URL declare?
+  const urlCategory  = (searchParams.get('category') || '').toLowerCase();
+  const isOnShopPath = pathname === '/shop';
+
+  // â”€â”€ Scroll shadow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleLogout = async () => {
     await logout();
     setIsUserMenuOpen(false);
     navigate('/');
   };
 
-  const [searchParams] = useSearchParams();
-  const { pathname } = useLocation();
-
-  // Read the active category directly from the live URL query string
-  const activeCategoryFromURL = searchParams.get('category') || '';
-  // Whether the user is on /shop at all (with no category = "All")
-  const isOnShop = pathname === '/shop';
-
-  const navLinks = [
-    { label: 'Shop', to: '/shop', category: '' },
-    { label: 'Men',   to: '/shop?category=Men',   category: 'Men'   },
-    { label: 'Women', to: '/shop?category=Women', category: 'Women' },
-    { label: 'Kids',  to: '/shop?category=Kids',  category: 'Kids'  },
-    { label: 'Sale',  to: '/shop?category=Sale',  category: 'Sale'  },
-  ];
-
-  /**
-   * Determines whether a nav link should show the active underline.
-   * - "Shop" (no category) is active only when on /shop with no category param.
-   * - Category links are active only when their category exactly matches the URL param.
-   */
-  const isNavLinkActive = (link) => {
-    if (!isOnShop) return false;
-    if (link.category === '') return activeCategoryFromURL === '';
-    return activeCategoryFromURL.toLowerCase() === link.category.toLowerCase();
-  };
-
-  /**
-   * Navigate to a category, clearing all other filters so the shop grid
-   * starts fresh (no stale subcategory / price / size bleed-through).
-   */
-  const handleNavCategory = (link) => {
-    if (link.category) {
-      navigate(`/shop?category=${link.category}`);
-    } else {
-      navigate('/shop');
-    }
+  // â”€â”€ Category navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Navigate to a category link, setting ONLY ?category= so the Shop page
+  // re-initialises its filter state cleanly (no stale subcategory/price bleed).
+  const handleCategoryClick = (link) => {
+    navigate(link.to);
     setIsMobileMenuOpen(false);
   };
 
+  // â”€â”€ Active link resolver â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Called by NavLink's className render prop. React Router's default isActive
+  // only compares pathnames and ignores query strings, so we override it here
+  // by reading the live URL category and comparing it against the link's own
+  // category value.  This is the only place that decides which link is "active".
+  const resolveNavActive = (link) => {
+    if (!isOnShopPath) return false;
+    if (link.category === '') return urlCategory === '';
+    return urlCategory === link.category.toLowerCase();
+  };
+
+  // â”€â”€ Shared class builders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const desktopLinkClass = (active) =>
+    [
+      'relative text-xs uppercase tracking-[0.15em] font-medium transition-colors duration-200',
+      'pb-1',                         // room for the underline pseudo-element
+      active
+        ? [
+            'text-[#111111]',
+            // The purple underline â€” rendered via an ::after pseudo-element.
+            // Tailwind's after: variants need the after:content-[""] anchor.
+            'after:content-[""] after:absolute after:bottom-0 after:left-0',
+            'after:w-full after:h-[2px] after:rounded-full after:bg-purple-600',
+            'after:transition-all after:duration-200',
+          ].join(' ')
+        : 'text-brand-900/60 hover:text-[#111111]',
+    ].join(' ');
+
+  const mobileLinkClass = (active) =>
+    [
+      'block w-full text-left py-3 px-4 rounded-sm transition-colors text-sm uppercase tracking-wider',
+      active
+        ? 'text-brand-900 font-semibold bg-nude-50 border-l-[3px] border-purple-600 pl-[13px]'
+        : 'text-brand-900/70 hover:text-brand-900 hover:bg-nude-50',
+    ].join(' ');
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
   return (
     <div className="min-h-screen flex flex-col bg-nude-50">
-      {/* ── Navbar ─────────────────────────────────────────────────────────── */}
+
+      {/* â”€â”€ Navbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <header
-        className="sticky top-0 z-50 bg-white border-b border-neutral-100/80 shadow-[0_4px_20px_rgba(26,25,24,0.05)] transition-all duration-300"
+        className={`sticky top-0 z-50 bg-white border-b border-neutral-100/80 transition-all duration-300 ${
+          isScrolled ? 'shadow-[0_4px_20px_rgba(26,25,24,0.08)]' : 'shadow-[0_4px_20px_rgba(26,25,24,0.05)]'
+        }`}
       >
         <div className="container-page">
           <nav className="flex items-center justify-between h-16 md:h-20">
+
             {/* Logo */}
             <Link id="nav-logo" to="/" className="flex items-center gap-2 md:gap-3 group">
               <Logo className="w-6 h-6 md:w-7 md:h-7 transition-transform duration-500 group-hover:scale-105" />
@@ -87,32 +120,38 @@ const UserLayout = () => {
             </Link>
 
             {/* Desktop nav links */}
-            <div className="hidden md:flex items-center gap-6">
-              {navLinks.map((link) => {
-                const active = isNavLinkActive(link);
+            <div className="hidden md:flex items-center gap-7">
+              {NAV_LINKS.map((link) => {
+                const active = resolveNavActive(link);
                 return (
-                  <button
+                  // We use NavLink for semantics + accessibility but override its
+                  // isActive logic entirely through the className render prop so the
+                  // active state is driven by the URL query param, not the pathname.
+                  <NavLink
                     key={link.label}
                     id={`nav-${link.label.toLowerCase()}`}
-                    onClick={() => handleNavCategory(link)}
-                    className={
-                      `text-xs uppercase tracking-[0.15em] font-medium transition-colors duration-200 relative dynamic-underline ${
-                        active
-                          ? 'text-[#111111] after:absolute after:bottom-[-4px] after:left-0 after:right-0 after:h-[2px] after:bg-purple-600 after:rounded-full'
-                          : 'text-[#111111] hover:text-neutral-500'
-                      }`
-                    }
+                    to={link.to}
+                    // Prevent NavLink from doing its own path matching â€” we control
+                    // active state via resolveNavActive() instead.
+                    className={() => desktopLinkClass(active)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleCategoryClick(link);
+                    }}
                   >
                     {link.label}
-                  </button>
+                  </NavLink>
                 );
               })}
             </div>
 
-            {/* Right icons */}
+            {/* Right action icons */}
             <div className="flex items-center gap-4">
+
+              {/* Search */}
               <button
                 id="nav-search"
+                aria-label="Open shop"
                 onClick={() => navigate('/shop')}
                 className="text-brand-900/60 hover:text-brand-900 transition-colors"
               >
@@ -122,6 +161,7 @@ const UserLayout = () => {
               {/* Cart */}
               <button
                 id="nav-cart"
+                aria-label="Open cart"
                 onClick={openCart}
                 className="relative text-brand-900/60 hover:text-brand-900 transition-colors"
               >
@@ -148,7 +188,10 @@ const UserLayout = () => {
                         user.name.charAt(0).toUpperCase()
                       )}
                     </div>
-                    <ChevronDown size={14} className={`text-brand-900/50 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      size={14}
+                      className={`text-brand-900/50 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`}
+                    />
                   </button>
 
                   {isUserMenuOpen && (
@@ -194,7 +237,7 @@ const UserLayout = () => {
                 <Link
                   id="nav-login"
                   to="/login"
-                  className="hidden sm:inline-block text-xs uppercase tracking-[0.15em] font-medium text-[#111111] hover:text-neutral-500 transition-colors duration-200 relative dynamic-underline"
+                  className="hidden sm:inline-block text-xs uppercase tracking-[0.15em] font-medium text-[#111111] hover:text-neutral-500 transition-colors duration-200"
                 >
                   Sign In
                 </Link>
@@ -203,35 +246,35 @@ const UserLayout = () => {
               {/* Mobile menu toggle */}
               <button
                 id="nav-mobile-menu"
+                aria-label="Toggle mobile menu"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="md:hidden text-brand-900/60 hover:text-brand-900 transition-colors ml-2"
               >
-                {isMobileMenuOpen ? <X size={24} strokeWidth={1.5} /> : <Menu size={24} strokeWidth={1.5} />}
+                {isMobileMenuOpen
+                  ? <X    size={24} strokeWidth={1.5} />
+                  : <Menu size={24} strokeWidth={1.5} />
+                }
               </button>
             </div>
           </nav>
 
           {/* Mobile menu */}
           {isMobileMenuOpen && (
-            <div className="md:hidden bg-white border-t border-line absolute left-0 right-0 top-16 shadow-elegant p-4 z-40 animate-slide-up">
-              {navLinks.map((link) => {
-                const active = isNavLinkActive(link);
-                return (
-                  <button
-                    key={link.label}
-                    onClick={() => handleNavCategory(link)}
-                    className={
-                      `block w-full text-left py-3 px-4 rounded-sm transition-colors text-sm uppercase tracking-wider ${
-                        active
-                          ? 'text-brand-900 font-semibold bg-nude-50 border-l-2 border-purple-600'
-                          : 'text-brand-900/70 hover:text-brand-900 hover:bg-nude-50'
-                      }`
-                    }
-                  >
-                    {link.label}
-                  </button>
-                );
-              })}
+            <div className="md:hidden bg-white border-t border-line absolute left-0 right-0 shadow-elegant p-4 z-40 animate-slide-up">
+              <div className="flex flex-col gap-1">
+                {NAV_LINKS.map((link) => {
+                  const active = resolveNavActive(link);
+                  return (
+                    <button
+                      key={link.label}
+                      onClick={() => handleCategoryClick(link)}
+                      className={mobileLinkClass(active)}
+                    >
+                      {link.label}
+                    </button>
+                  );
+                })}
+              </div>
               {!user && (
                 <Link
                   to="/login"
@@ -246,12 +289,12 @@ const UserLayout = () => {
         </div>
       </header>
 
-      {/* ── Main Content ───────────────────────────────────────────────────── */}
+      {/* â”€â”€ Main Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <main className="flex-1">
         <Outlet />
       </main>
 
-      {/* ── Footer ─────────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <footer className="bg-nude-100 border-t border-line mt-20">
         <div className="container-page py-16">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
@@ -290,7 +333,7 @@ const UserLayout = () => {
             </div>
           </div>
           <div className="border-t border-line mt-16 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-brand-900/40 text-xs">© {new Date().getFullYear()} THREADHAUS. All rights reserved.</p>
+            <p className="text-brand-900/40 text-xs">Â© {new Date().getFullYear()} THREADHAUS. All rights reserved.</p>
             <p className="text-brand-900/40 text-xs">Secure payments via Stripe</p>
           </div>
         </div>
