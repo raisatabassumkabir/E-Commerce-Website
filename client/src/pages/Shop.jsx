@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { Search, ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import api from '../services/api';
 import ProductCard from '../components/ProductCard';
@@ -16,56 +16,82 @@ const SORT_OPTIONS = [
 ];
 
 const DEFAULT_FILTERS = {
-  category: '',
+  category:    '',
   subcategory: '',
-  size: '',
-  color: '',
-  minPrice: '',
-  maxPrice: '',
+  size:        '',
+  color:       '',
+  minPrice:    '',
+  maxPrice:    '',
   inStockOnly: '',
 };
 
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  // Debounced search term
-  const [keyword, setKeyword] = useState(searchParams.get('keyword') || '');
-  const [localKeyword, setLocalKeyword] = useState(searchParams.get('keyword') || '');
-  
-  const [sort, setSort] = useState('newest');
+  const location = useLocation(); // ← tracks every URL change, including navbar clicks
+
+  const [products,    setProducts]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [total,       setTotal]       = useState(0);
+  const [page,        setPage]        = useState(1);
+  const [totalPages,  setTotalPages]  = useState(1);
+  const [sort,        setSort]        = useState('newest');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  // Initialize filters from URL params
+  // Debounced search keyword — kept separate so typing doesn't thrash the API
+  const [keyword,      setKeyword]      = useState(searchParams.get('keyword') || '');
+  const [localKeyword, setLocalKeyword] = useState(searchParams.get('keyword') || '');
+
+  // All other filters — initialised from URL on first render
   const [filters, setFilters] = useState({
-    category: searchParams.get('category') || '',
+    category:    searchParams.get('category')    || '',
     subcategory: searchParams.get('subcategory') || '',
-    size: searchParams.get('size') || '',
-    color: searchParams.get('color') || '',
-    minPrice: searchParams.get('minPrice') || '',
-    maxPrice: searchParams.get('maxPrice') || '',
+    size:        searchParams.get('size')        || '',
+    color:       searchParams.get('color')       || '',
+    minPrice:    searchParams.get('minPrice')    || '',
+    maxPrice:    searchParams.get('maxPrice')    || '',
     inStockOnly: searchParams.get('inStockOnly') || '',
   });
 
-  // Debounce logic for search query
+  // ─── URL → State sync ────────────────────────────────────────────────────────
+  // This is the core fix. Every time the URL changes (navbar clicks, browser
+  // back/forward, deep links) we re-read ALL filter params from the URL and push
+  // them into local state. This makes the URL the single source of truth and
+  // ensures the product grid always reflects what the URL says.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setKeyword(localKeyword);
-    }, 400);
+    const urlCategory    = searchParams.get('category')    || '';
+    const urlSubcategory = searchParams.get('subcategory') || '';
+    const urlSize        = searchParams.get('size')        || '';
+    const urlColor       = searchParams.get('color')       || '';
+    const urlMinPrice    = searchParams.get('minPrice')    || '';
+    const urlMaxPrice    = searchParams.get('maxPrice')    || '';
+    const urlInStockOnly = searchParams.get('inStockOnly') || '';
+    const urlKeyword     = searchParams.get('keyword')     || '';
+
+    // Batch-update filters in one setState call to avoid cascade re-renders
+    setFilters({
+      category:    urlCategory,
+      subcategory: urlSubcategory,
+      size:        urlSize,
+      color:       urlColor,
+      minPrice:    urlMinPrice,
+      maxPrice:    urlMaxPrice,
+      inStockOnly: urlInStockOnly,
+    });
+
+    // Sync keyword fields too
+    setKeyword(urlKeyword);
+    setLocalKeyword(urlKeyword);
+
+    // Always jump back to page 1 when the URL (i.e. the category) changes
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]); // ← depends on the raw query string, not the parsed object
+
+  // ─── Debounce: local search input → debounced keyword ────────────────────────
+  useEffect(() => {
+    const timer = setTimeout(() => setKeyword(localKeyword), 400);
     return () => clearTimeout(timer);
   }, [localKeyword]);
-
-  // Sync search keyword with URL param if it changes externally
-  useEffect(() => {
-    const urlKeyword = searchParams.get('keyword') || '';
-    if (urlKeyword !== localKeyword) {
-      setLocalKeyword(urlKeyword);
-      setKeyword(urlKeyword);
-    }
-  }, [searchParams]);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
