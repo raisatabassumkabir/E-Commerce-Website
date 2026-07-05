@@ -252,6 +252,44 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
   });
 });
 
+// ── Forgot-password rate limiter (in-memory) ──────────────────────────────────
+// Max 3 requests per email per 15-minute window. Prevents abuse without a Redis
+// dependency. Automatically cleans up expired entries.
+const FORGOT_PW_RATE_LIMIT = {
+  maxAttempts: 3,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+};
+const forgotPasswordAttempts = new Map(); // email → { count, firstAttempt }
+
+function checkForgotPasswordRateLimit(email) {
+  const now = Date.now();
+  const key = email.toLowerCase();
+  const entry = forgotPasswordAttempts.get(key);
+
+  if (!entry || now - entry.firstAttempt > FORGOT_PW_RATE_LIMIT.windowMs) {
+    // First attempt or window expired — reset
+    forgotPasswordAttempts.set(key, { count: 1, firstAttempt: now });
+    return true;
+  }
+
+  if (entry.count >= FORGOT_PW_RATE_LIMIT.maxAttempts) {
+    return false; // Rate limited
+  }
+
+  entry.count += 1;
+  return true;
+}
+
+// Periodic cleanup of stale rate-limit entries (every 30 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of forgotPasswordAttempts) {
+    if (now - entry.firstAttempt > FORGOT_PW_RATE_LIMIT.windowMs) {
+      forgotPasswordAttempts.delete(key);
+    }
+  }
+}, 30 * 60 * 1000).unref(); // .unref() so it doesn't keep the process alive
+
 // ── POST /api/auth/forgot-password ─────────────────────────────────────────────
 const forgotPassword = asyncHandler(async (req, res, next) => {
   const errors = validationResult(req);
@@ -261,13 +299,19 @@ const forgotPassword = asyncHandler(async (req, res, next) => {
 
   const { email } = req.body;
 
-  // Search the entire collection by email
+  // Consistent response message — never reveal whether the email exists
+  const SUCCESS_MESSAGE = 'If an account with that email exists, a password reset link has been sent.';
+
+  // Rate limiting
+  if (!checkForgotPasswordRateLimit(email)) {
+    // Return same success message to prevent timing-based enumeration
+    return res.status(200).json({ success: true, message: SUCCESS_MESSAGE });
+  }
+
   const user = await User.findOne({ email });
   if (!user) {
-    return res.status(404).json({
-      success: false,
-      message: 'No account found with this email address.',
-    });
+    // Return success even if no user found — prevents email enumeration
+    return res.status(200).json({ success: true, message: SUCCESS_MESSAGE });
   }
 
   // Generate token and 1-hour expiration
@@ -279,15 +323,14 @@ const forgotPassword = asyncHandler(async (req, res, next) => {
 
   try {
     await sendResetPasswordEmail(user.email, user.name, resetToken);
-    res.status(200).json({
-      success: true,
-      message: 'Password reset link sent to your email.',
-    });
+    res.status(200).json({ success: true, message: SUCCESS_MESSAGE });
   } catch (err) {
+    // Roll back the reset token so the user can try again
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save({ validateBeforeSave: false });
-    return next(new AppError('There was an error sending the email. Try again later.', 500));
+    console.error('[ForgotPassword] Email send failed:', err.message);
+    return next(new AppError('There was an error sending the email. Please try again later.', 500));
   }
 });
 

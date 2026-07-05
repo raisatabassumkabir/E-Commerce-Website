@@ -120,6 +120,12 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 const serverListener = server.listen(PORT, () => {
   console.log(`✅  Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+
+  // Verify SMTP email transporter on startup (non-blocking)
+  const { verifyTransporter } = require('./src/utils/email');
+  verifyTransporter().catch(() => {
+    // Already logged inside verifyTransporter — no action needed here.
+  });
 });
 
 // Handle unhandled promise rejections gracefully
