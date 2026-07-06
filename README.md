@@ -32,7 +32,7 @@ A modern, fully-featured e-commerce platform built with the MERN stack (MongoDB,
 - **Authentication:** JSON Web Tokens (JWT) & BcryptJS
 - **Payments:** Stripe API
 - **File Storage:** Cloudinary & Multer
-- **Emails:** Resend & Nodemailer
+- **Emails:** Gmail REST API (Fetch)
 - **Real-time:** Socket.IO
 
 ## 📁 Project Structure
@@ -48,7 +48,7 @@ The repository is organized into two main directories:
 - MongoDB instance (local or MongoDB Atlas)
 - Stripe Account (for payments)
 - Cloudinary Account (for image uploads)
-- Resend Account (for transactional emails)
+- Gmail Account (for transactional emails via OAuth2)
 
 ### 1. Clone the repository
 ```bash
@@ -69,7 +69,10 @@ Create a `.env` file in the `server` directory and configure the necessary envir
 - `CLOUDINARY_CLOUD_NAME`
 - `CLOUDINARY_API_KEY`
 - `CLOUDINARY_API_SECRET`
-- `RESEND_API_KEY`
+- `EMAIL_USER`
+- `GMAIL_CLIENT_ID`
+- `GMAIL_CLIENT_SECRET`
+- `GMAIL_REFRESH_TOKEN`
 
 Start the development server:
 ```bash
