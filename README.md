@@ -45,7 +45,7 @@ The repository is organized into two main directories:
 
 ### Prerequisites
 - Node.js (v18+)
-- MongoDB instance (local or MongoDB Atlas)
+- MongoDB instance (MongoDB Atlas)
 - Stripe Account (for payments)
 - Cloudinary Account (for image uploads)
 - Gmail Account (for transactional emails via OAuth2)
