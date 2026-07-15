@@ -38,6 +38,10 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'admin'],
       default: 'user',
     },
+    timezone: {
+      type: String,
+      default: 'America/New_York',
+    },
     avatar: {
       type: String,
       default: '',

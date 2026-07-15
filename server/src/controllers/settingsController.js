@@ -63,6 +63,47 @@ exports.updateSettings = asyncHandler(async (req, res) => {
     }
   });
 
+  // ── SEO & Social Meta ───────────────────────────────────────────────────────
+  if (req.body.seoMetaTitle !== undefined) settings.seo.metaTitle = req.body.seoMetaTitle;
+  if (req.body.seoMetaDescription !== undefined) settings.seo.metaDescription = req.body.seoMetaDescription;
+  if (req.body.seoOgImageUrl !== undefined) settings.seo.ogImageUrl = req.body.seoOgImageUrl;
+
+  // ── Currency & Tax ──────────────────────────────────────────────────────────
+  if (req.body.currencySymbol !== undefined) settings.currency.symbol = req.body.currencySymbol;
+  if (req.body.currencyCode !== undefined) settings.currency.code = req.body.currencyCode;
+  if (req.body.taxRate !== undefined) settings.currency.taxRate = parseFloat(req.body.taxRate) || 0;
+  if (req.body.taxInclusive !== undefined) settings.currency.taxInclusive = req.body.taxInclusive === 'true';
+
+  // ── Shipping Configuration ──────────────────────────────────────────────────
+  if (req.body.freeShippingThreshold !== undefined) settings.shipping.freeShippingThreshold = parseFloat(req.body.freeShippingThreshold) || 0;
+  if (req.body.shippingFlatRate !== undefined) settings.shipping.flatRate = parseFloat(req.body.shippingFlatRate) || 0;
+  if (req.body.estimatedDeliveryDays !== undefined) settings.shipping.estimatedDeliveryDays = parseInt(req.body.estimatedDeliveryDays, 10) || 5;
+
+  // ── Order Policies ──────────────────────────────────────────────────────────
+  if (req.body.autoCancelDays !== undefined) settings.orderPolicies.autoCancelDays = parseInt(req.body.autoCancelDays, 10) || 7;
+  if (req.body.lowStockThreshold !== undefined) settings.orderPolicies.lowStockThreshold = parseInt(req.body.lowStockThreshold, 10) || 5;
+
+  // ── Notification Preferences ────────────────────────────────────────────────
+  if (req.body.notifyNewOrder !== undefined) settings.notifications.newOrderEmail = req.body.notifyNewOrder === 'true';
+  if (req.body.notifyLowStock !== undefined) settings.notifications.lowStockEmail = req.body.notifyLowStock === 'true';
+  if (req.body.notifyStatusChange !== undefined) settings.notifications.statusChangeEmail = req.body.notifyStatusChange === 'true';
+
+  // ── Social Media Links ──────────────────────────────────────────────────────
+  if (req.body.socialInstagram !== undefined) settings.socialLinks.instagram = req.body.socialInstagram;
+  if (req.body.socialTwitter !== undefined) settings.socialLinks.twitter = req.body.socialTwitter;
+  if (req.body.socialFacebook !== undefined) settings.socialLinks.facebook = req.body.socialFacebook;
+  if (req.body.socialTiktok !== undefined) settings.socialLinks.tiktok = req.body.socialTiktok;
+
+  // ── Store Policies ──────────────────────────────────────────────────────────
+  if (req.body.returnWindowDays !== undefined) settings.storePolicies.returnWindowDays = parseInt(req.body.returnWindowDays, 10) || 30;
+  if (req.body.refundPolicyUrl !== undefined) settings.storePolicies.refundPolicyUrl = req.body.refundPolicyUrl;
+  if (req.body.privacyPolicyUrl !== undefined) settings.storePolicies.privacyPolicyUrl = req.body.privacyPolicyUrl;
+  if (req.body.termsUrl !== undefined) settings.storePolicies.termsUrl = req.body.termsUrl;
+
+  // ── Analytics & Tracking ────────────────────────────────────────────────────
+  if (req.body.googleAnalyticsId !== undefined) settings.analytics.googleAnalyticsId = req.body.googleAnalyticsId;
+  if (req.body.facebookPixelId !== undefined) settings.analytics.facebookPixelId = req.body.facebookPixelId;
+
   const updated = await settings.save();
   res.status(200).json({ success: true, settings: updated });
 });

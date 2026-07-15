@@ -95,6 +95,7 @@ const login = asyncHandler(async (req, res, next) => {
       email: user.email,
       role: user.role,
       avatar: user.avatar,
+      timezone: user.timezone,
     },
     cart: user.cart,
   });
@@ -114,13 +115,36 @@ const getMe = asyncHandler(async (req, res) => {
 
 // ── PUT /api/auth/profile ──────────────────────────────────────────────────────
 const updateProfile = asyncHandler(async (req, res, next) => {
-  const { name, email } = req.body;
+  const { name, email, timezone } = req.body;
 
   const user = await User.findById(req.user._id);
   if (!user) return next(new AppError('User not found.', 404));
 
-  if (name) user.name = name;
-  if (email) user.email = email;
+  if (name !== undefined) {
+    if (!name.trim()) {
+      return next(new AppError('Display name cannot be empty.', 400));
+    }
+    user.name = name.trim();
+  }
+
+  if (email !== undefined) {
+    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) {
+      return next(new AppError('Please provide a valid email address.', 400));
+    }
+    user.email = email.trim();
+  }
+
+  if (timezone !== undefined) {
+    if (!timezone.trim()) {
+      return next(new AppError('Timezone cannot be empty.', 400));
+    }
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: timezone.trim() });
+      user.timezone = timezone.trim();
+    } catch (err) {
+      return next(new AppError('Invalid timezone name. Please select a valid US timezone.', 400));
+    }
+  }
   
   if (req.file) {
     const isLocal = !req.file.path.startsWith('http');
@@ -133,7 +157,7 @@ const updateProfile = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    user: { _id: user._id, name: user.name, email: user.email, role: user.role, avatar: user.avatar },
+    user: { _id: user._id, name: user.name, email: user.email, role: user.role, avatar: user.avatar, timezone: user.timezone },
   });
 });
 
@@ -247,6 +271,7 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
       email: user.email,
       role: user.role,
       avatar: user.avatar,
+      timezone: user.timezone,
     },
     cart: user.cart,
   });
@@ -382,6 +407,7 @@ const resetPassword = asyncHandler(async (req, res, next) => {
       email: user.email,
       role: user.role,
       avatar: user.avatar,
+      timezone: user.timezone,
     },
     cart: user.cart,
   });

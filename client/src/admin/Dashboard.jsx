@@ -7,6 +7,7 @@ import {
 import api from '../services/api';
 import Spinner from '../components/Spinner';
 import StatusBadge from '../components/StatusBadge';
+import { useAuthStore } from '../store/useAuthStore';
 
 const StatCard = ({ title, value, icon: Icon, trend, color, sub }) => (
   <div className="bg-white border border-neutral-200/60 shadow-subtle rounded-2xl p-6 flex items-start justify-between hover:shadow-elegant transition-shadow">
@@ -23,11 +24,13 @@ const StatCard = ({ title, value, icon: Icon, trend, color, sub }) => (
 );
 
 const Dashboard = () => {
+  const { user } = useAuthStore();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isLowStockOpen, setIsLowStockOpen] = useState(false);
   const [isRecentOrdersOpen, setIsRecentOrdersOpen] = useState(true);
   const [isOrderBreakdownOpen, setIsOrderBreakdownOpen] = useState(true);
+  const [greeting, setGreeting] = useState('Welcome back');
 
   useEffect(() => {
     api.get('/orders/admin/stats')
@@ -35,6 +38,38 @@ const Dashboard = () => {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      const tz = user.timezone || 'America/New_York';
+      const getGreeting = () => {
+        try {
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: tz,
+            hour: 'numeric',
+            hour12: false,
+          });
+          const parts = formatter.formatToParts(new Date());
+          const hourPart = parts.find(p => p.type === 'hour');
+          const hour = hourPart ? parseInt(hourPart.value, 10) : new Date().getHours();
+          
+          if (!isNaN(hour) && hour >= 5 && hour < 12) {
+            return 'Good morning';
+          } else if (!isNaN(hour) && hour >= 12 && hour < 17) {
+            return 'Good afternoon';
+          } else {
+            return 'Good evening';
+          }
+        } catch (error) {
+          const hour = new Date().getHours();
+          if (hour >= 5 && hour < 12) return 'Good morning';
+          if (hour >= 12 && hour < 17) return 'Good afternoon';
+          return 'Good evening';
+        }
+      };
+      setGreeting(getGreeting());
+    }
+  }, [user]);
 
   if (loading) {
     return <div className="flex justify-center py-20"><Spinner size="xl" /></div>;
@@ -44,9 +79,16 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div>
-        <h1 className="heading-display text-2xl text-neutral-900 mb-1">Dashboard</h1>
-        <p className="text-neutral-500 text-sm">ThreadHaus Store Overview</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/70 backdrop-blur-md border border-neutral-200/60 shadow-elegant rounded-2xl p-6">
+        <div>
+          <h1 className="heading-display text-2xl text-neutral-900 mb-1">
+            {greeting}, {user?.name || 'Admin'}!
+          </h1>
+          <p className="text-neutral-500 text-sm font-medium">Here is what's happening with ThreadHaus today.</p>
+        </div>
+        <div className="text-xs text-neutral-400 font-medium md:text-right bg-neutral-50/50 border border-neutral-200/60 rounded-xl px-4 py-2 self-start md:self-auto shadow-subtle">
+          Timezone: <span className="text-neutral-700 font-semibold">{user?.timezone || 'America/New_York'}</span>
+        </div>
       </div>
 
       {/* ── KPI Cards ──────────────────────────────────────────────────────── */}
